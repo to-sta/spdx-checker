@@ -1,0 +1,3 @@
+from __future__ import annotations
+
+def spdx_license_checker(license, list_of_file_paths, /): ...

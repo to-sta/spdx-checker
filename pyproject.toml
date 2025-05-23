@@ -1,0 +1,39 @@
+[build-system]
+requires = ["poetry-core", "ziggy-pydust==0.23.2"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "spdx-checker"
+version = "0.1.0"
+description = ""
+authors = ["Tobias Stach <tobias.stach@gmail.com>"]
+readme = "README.md"
+packages = [{ include = "spdx_checker" }]
+include = [
+    { path = "src/", format = "sdist" },
+    { path = "spdx_checker/*.so", format = "wheel" },
+    "spdx_checker/*.pyi"
+]
+
+[tool.poetry.build]
+script = "build.py"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[tool.poetry.group.dev.dependencies]
+ziggy-pydust = "0.23.2"
+pytest = "^8.0.0"
+ruff = "^0.4.0"
+black = "^23.7.0"
+
+[tool.black]
+line-length = 120
+
+[tool.ruff]
+line-length = 120
+select = ["F", "E", "W", "UP", "I001", "I002"]
+
+[[tool.pydust.ext_module]]
+name = "spdx_checker.spdx_checker"
+root = "src/spdx_checker.zig"
