@@ -10,6 +10,7 @@ on:
 
 env:
   CIBW_BUILD_FRONTEND: "build[uv]"
+  CIBW_BUILD_VERBOSITY: 3
 
 jobs:
   build_wheels:
