@@ -9,9 +9,12 @@ on:
 env:
   CIBW_BUILD_FRONTEND: "build[uv]"
   CIBW_BUILD_VERBOSITY: 3
-  # Pass PATH so cibuildwheel can find zig installed by setup-zig action
+  
   CIBW_ENVIRONMENT_PASS_LINUX: "PATH"
+
   CIBW_ENVIRONMENT_PASS_MACOS: "PATH"
+  CIBW_ENVIRONMENT_MACOS: "MACOSX_DEPLOYMENT_TARGET=10.15"
+
   CIBW_ENVIRONMENT_PASS_WINDOWS: "PATH"
 jobs:
   build_wheels:
