@@ -33,6 +33,10 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
+
       - name: Build source and wheel distributions
         run: uv build
 
