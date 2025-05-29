@@ -8,14 +8,10 @@ on:
       - "[0-9]+.[0-9]+.[0-9]+rc[0-9]+"
 env:
   CIBW_BUILD_FRONTEND: "build[uv]"
-  CIBW_BUILD_VERBOSITY: 3
-  
-  CIBW_ENVIRONMENT_PASS_LINUX: "PATH"
+  CIBW_ENVIRONMENT_LINUX: "PATH=${{ github.workspace }}/zig-bin:$PATH"
+  CIBW_ENVIRONMENT_MACOS: "PATH=${{ github.workspace }}/zig-bin:$PATH MACOSX_DEPLOYMENT_TARGET=14.7"
+  CIBW_ENVIRONMENT_WINDOWS: "PATH=${{ github.workspace }}\\zig-bin;%PATH%"
 
-  CIBW_ENVIRONMENT_PASS_MACOS: "PATH"
-  CIBW_ENVIRONMENT_MACOS: "MACOSX_DEPLOYMENT_TARGET=14.7"
-
-  CIBW_ENVIRONMENT_PASS_WINDOWS: "PATH"
 jobs:
   build_wheels:
     name: Build wheels on ${{ matrix.os }}
@@ -29,6 +25,22 @@ jobs:
         uses: mlugg/setup-zig@v2
         with:
           version: 0.14.0
+
+      - name: Symlink Zig to local bin (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/zig-bin
+          ln -s $(which zig) $GITHUB_WORKSPACE/zig-bin/zig
+
+      - name: Copy Zig to local bin (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $zig = (Get-Command zig).Source
+          $binDir = "$env:GITHUB_WORKSPACE\\zig-bin"
+          New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+          Copy-Item -Path $zig -Destination "$binDir\\zig.exe"
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
       - name: Build wheels
