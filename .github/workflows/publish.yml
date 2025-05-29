@@ -27,6 +27,9 @@ jobs:
         with:
           version: 0.14.0
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.23.3
 
@@ -35,6 +38,7 @@ jobs:
         with:
           name: cibw-wheels
           path: ./wheelhouse/*.whl
+
 
   pypi_publish:
     name: Upload release to PyPI
@@ -51,7 +55,7 @@ jobs:
           name: cibw-wheels
           path: ./wheelhouse/
 
-      - name: Install uv
+      - name: Install uv for publishing
         uses: astral-sh/setup-uv@v4
 
       - name: Publish to PyPI
