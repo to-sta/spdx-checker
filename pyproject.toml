@@ -13,7 +13,7 @@ authors = [
 
 
 [build-system]
-requires = ["setuptools", "wheel", "builder"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 backend-path = ["."] 
 

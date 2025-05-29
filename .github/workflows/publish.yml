@@ -27,6 +27,9 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v4
 
+      - name: Ensure setuptools is available
+        run: uv pip install setuptools
+
       - name: Install dependencies
         run: uv sync
 
