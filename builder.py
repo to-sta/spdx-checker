@@ -29,8 +29,10 @@ class ZigBuilder(build_ext):
                 "-L",
                 LIB_DIR,
                 f"-femit-bin={self.get_ext_fullpath(ext.name)}",
-                "-l",
-                f"{'python3' if is_windows else 'python' + PYTHON_VERSION}",
+                *([
+                    "-l",
+                    "python3",
+                ] if is_windows else []),
                 ext.sources[0],
             ]
         )
