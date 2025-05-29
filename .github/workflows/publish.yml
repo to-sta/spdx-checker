@@ -19,6 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name : Set up Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.0
+      
       - uses: actions/setup-python@v5
         id: setup-python
         with:
@@ -32,10 +38,6 @@ jobs:
 
       - name: Install dependencies
         run: uv sync
-
-      - uses: mlugg/setup-zig@v2
-        with:
-          version: 0.14.0
 
       - name: Build source and wheel distributions
         run: uv build
