@@ -41,6 +41,12 @@ jobs:
 
       - name: Build source and wheel distributions
         run: uv build
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
 
   pypi_publish:
