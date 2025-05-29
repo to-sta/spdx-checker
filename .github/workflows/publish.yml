@@ -2,18 +2,17 @@ name: Publish
 
 on:
   push:
-    tags: ['*']
-
-permissions:
-  id-token: write
-  contents: read
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+a[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+b[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+rc[0-9]+"
 
 env:
-  POETRY_VERSION: "2.1.3"
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.13"
 
 jobs:
-  publish:
+  build:
     environment:
       name: pypi
       url: https://pypi.org/p/ziggy-pydust-template
@@ -25,31 +24,33 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Load cached Poetry installation
-        id: cached-poetry
-        uses: actions/cache@v4
-        with:
-          path: ~/.local
-          key: poetry-${{ runner.os }}-${{ env.POETRY_VERSION  }}-${{ steps.setup-python.outputs.python-version }}
-      - name: Install Poetry
-        id: install-poetry
-        if: steps.cached-poetry.outputs.cache-hit != 'true'
-        uses: snok/install-poetry@v1
-        with:
-          version: ${{ env.POETRY_VERSION }}
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
-      - name: Poetry git plugin
-        run: poetry self add poetry-git-version-plugin
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
 
-      - name: Poetry Build
-        run: poetry build -v
-      - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build source and wheel distributions
+        run: uv build
+
+
+  pypi_publish:
+    name: Upload release to PyPI
+    needs: [build]
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    permissions:
+      id-token: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Publish to PyPI
+        run: uv publish

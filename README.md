@@ -1,7 +1,16 @@
-# SPDX License Checker
+Build command
 
-`spdx-checker` is a fast Python package for validating and analyzing SPDX license headers in your projects. Built with [Pydust-Ziggy](https://github.com/fulcrum-so/ziggy-pydust), it leverages Zig for exceptional speed and efficiency.
+Windows CLI command
+zig build-lib -lc -dynamic -I "C:\Users\tobia\AppData\Local\Programs\Python\Python313\include" -L "C:\Users\tobia\AppData\Local\Programs\Python\Python313\libs" -l "python3" simple.zig
 
-## License
+File name needs to be changed:
+* simple.dll.obj
+* simple.dll -> simple.pyd
 
-[MIT](LICENSE)
+WSL Ubuntu CLI command
+zig build-lib -lc -dynamic -I "/usr/include/python3.12" -L "/usr/lib/x86_6
+4-linux-gnu/" -l "python3.12" simple.zig
+
+File name needs to be changed:
+* libsimple.a -> simple.a
+* libsimple.so -> simple.so
