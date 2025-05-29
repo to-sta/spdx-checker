@@ -22,8 +22,7 @@ ext-modules = [
     { name = "spdx_checker", sources = ["extension/main.zig", "extension/utils.zig", "extension/licenses.zig"] }]
 include-package-data = false
 
-[tool.uv]
-no-build-isolation = true
+
 
 [dependency-groups]
 dev = [
