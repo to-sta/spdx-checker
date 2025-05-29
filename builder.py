@@ -35,32 +35,3 @@ class ZigBuilder(build_ext):
             ]
         )
 
-
-def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
-    spdx_checker = Extension(name="spdx_checker", sources=["extension/main.zig"])
-
-    original_setup = setup
-
-    def custom_setup(*args, **kwargs):
-        kwargs.update(
-            {
-                "ext_modules": [spdx_checker],
-                "cmdclass": {"build_ext": ZigBuilder},
-                "py_modules": ["builder"],
-            }
-        )
-        return original_setup(*args, **kwargs)
-
-    # Replace setup temporarily
-    import setuptools
-
-    setuptools.setup = custom_setup
-
-    try:
-        return _build_wheel(wheel_directory, config_settings, metadata_directory)
-    finally:
-        setuptools.setup = original_setup
-
-
-def build_sdist(sdist_directory, config_settings=None):
-    return _build_sdist(sdist_directory, config_settings)

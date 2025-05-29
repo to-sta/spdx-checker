@@ -12,16 +12,16 @@ authors = [
 ]
 
 
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
-backend-path = ["."] 
+# [build-system]
+# requires = ["setuptools", "wheel"]
+# build-backend = "setuptools.build_meta::__legacy__"
+# backend-path = ["."] 
 
-[tool.setuptools]
-# ext-modules = [
-#     { name = "spdx_checker", sources = ["extension/main.zig", "extension/utils.zig", "extension/licenses.zig"] }]
-# include-package-data = false
-py-modules = ["builder"]
+# [tool.setuptools]
+# # ext-modules = [
+# #     { name = "spdx_checker", sources = ["extension/main.zig", "extension/utils.zig", "extension/licenses.zig"] }]
+# # include-package-data = false
+# py-modules = ["builder"]
 
 
 
