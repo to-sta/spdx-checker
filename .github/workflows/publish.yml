@@ -14,7 +14,7 @@ env:
     cp -r zig-linux-x86_64-0.14.0/* /opt/zig
   CIBW_ENVIRONMENT_LINUX: "PATH=/opt/zig:$PATH"
   CIBW_ENVIRONMENT_MACOS: "PATH=${{ github.workspace }}/zig-bin:$PATH MACOSX_DEPLOYMENT_TARGET=14.7"
-  CIBW_ENVIRONMENT_WINDOWS: "PATH=${{ github.workspace }}\\zig-bin;%PATH%"
+  CIBW_ENVIRONMENT_WINDOWS: PATH=${{ github.workspace }}/zig-bin:$PATH
 
 jobs:
   build_wheels:
