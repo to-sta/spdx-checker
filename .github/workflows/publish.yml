@@ -71,8 +71,9 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: cibw-wheels
+          pattern: cibw-wheels-*
           path: ./wheelhouse/
+          merge-multiple: true
 
       - name: Install uv for publishing
         uses: astral-sh/setup-uv@v4
