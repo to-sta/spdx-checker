@@ -15,7 +15,7 @@ env:
   CIBW_ENVIRONMENT_LINUX: "PATH=/opt/zig:$PATH"
   CIBW_ENVIRONMENT_MACOS: "PATH=${{ github.workspace }}/zig-bin:$PATH MACOSX_DEPLOYMENT_TARGET=14.7"
   CIBW_ENVIRONMENT_WINDOWS: PATH=${{ github.workspace }}/zig-bin:$PATH
-  CIBW_BUILD: "cp313-macosx_x86_64 cp313-macosx_arm64 cp312-manylinux_x86_64 cp312-win_amd64"
+  CIBW_BUILD: "cp313-macosx_x86_64 cp313-macosx_arm64 cp313-manylinux_x86_64 cp313-win_amd64"
 
 jobs:
   build_wheels:
