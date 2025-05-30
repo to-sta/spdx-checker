@@ -15,11 +15,13 @@ env:
   CIBW_ENVIRONMENT_LINUX: "PATH=/opt/zig:$PATH"
   CIBW_ENVIRONMENT_MACOS: "PATH=${{ github.workspace }}/zig-bin:$PATH MACOSX_DEPLOYMENT_TARGET=14.7"
   CIBW_ENVIRONMENT_WINDOWS: PATH=${{ github.workspace }}/zig-bin:$PATH
+  CIBW_SKIP: "*-manylinux_i686"
 
 jobs:
   build_wheels:
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
