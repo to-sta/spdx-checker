@@ -9,11 +9,6 @@ INCLUDE_DIR = sysconfig.get_config_var("INCLUDEPY")
 PYTHON_VERSION = sysconfig.get_config_var("py_version_short")
 PACKAGE_NAME = "spdx_checker"
 
-print(f"Platform: {platform.system()}")
-print(f"Architecture: {platform.machine()}")
-print(f"LIB_DIR: {LIB_DIR}")
-print(f"INCLUDE_DIR: {INCLUDE_DIR}")
-
 
 class ZigBuilder(build_ext):
     def build_extension(self, ext) -> None:
