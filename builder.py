@@ -1,9 +1,6 @@
 import sysconfig
 import platform
 from setuptools.command.build_ext import build_ext
-from setuptools import Extension, setup
-from setuptools.build_meta import build_wheel as _build_wheel
-from setuptools.build_meta import build_sdist as _build_sdist
 
 
 INSTALL_BASE = sysconfig.get_config_var("installed_base")
@@ -12,7 +9,10 @@ INCLUDE_DIR = sysconfig.get_config_var("INCLUDEPY")
 PYTHON_VERSION = sysconfig.get_config_var("py_version_short")
 PACKAGE_NAME = "spdx_checker"
 
-
+print(f"Platform: {platform.system()}")
+print(f"Architecture: {platform.machine()}")
+print(f"LIB_DIR: {LIB_DIR}")
+print(f"INCLUDE_DIR: {INCLUDE_DIR}")
 
 
 class ZigBuilder(build_ext):
