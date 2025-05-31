@@ -205,12 +205,14 @@ var Methods = [_]PyMethodDef{
     },
 };
 
+const ModuleBase = extern struct {
+     ob_refcnt: u64 = 1,
+     ob_type: ?*u8 = null,
+};
+
 var module = PyModuleDef{
     .m_base = PyModuleDef_Base{
-        .ob_base = PyObject{
-            .unnamed_0 = .{ .ob_refcnt = @as(c_longlong, 0xffffffff) },
-            .ob_type = null,
-        },
+        .ob_base = @as(PyObject, @bitCast(ModuleBase{})),
         .m_init = null,
         .m_index = 0,
         .m_copy = null,

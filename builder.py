@@ -1,3 +1,4 @@
+import os
 import sysconfig
 import platform
 from setuptools.command.build_ext import build_ext
@@ -8,6 +9,12 @@ LIB_DIR = sysconfig.get_config_var("LIBDIR")
 INCLUDE_DIR = sysconfig.get_config_var("INCLUDEPY")
 PYTHON_VERSION = sysconfig.get_config_var("py_version_short")
 PACKAGE_NAME = "spdx_checker"
+
+
+if LIB_DIR is None:
+    # WINODWS only, workaround for Python versions < 3.13.
+    LIB_DIR = os.path.join(INSTALL_BASE, "libs")
+
 
 
 class ZigBuilder(build_ext):
