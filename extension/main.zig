@@ -46,7 +46,8 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
     var target_license_ptr: [*:0]u8 = undefined;
     var file_paths_obj: [*c]PyObject = null;
 
-    if (py.PyArg_ParseTuple(args, "sO", &target_license_ptr, &file_paths_obj) == 0) {
+    // Accepts: (str, list)
+    if (py.PyArg_ParseTuple(args, "sO!", &target_license_ptr, &py.PyList_Type, &file_paths_obj) == 0) {
         std.debug.print("Expected two arguments: target_license (str), file_paths (list)\n", .{});
         py.PyErr_SetString(py.PyExc_ValueError, "Expected two arguments: target_license (str), file_paths (list)");
         return null;
@@ -54,39 +55,49 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
 
     const target_license = std.mem.span(target_license_ptr);
 
-    // file_paths_string_ptr is now a Python list object
     var file_paths_string = std.ArrayList([]const u8).init(gpa.allocator());
     defer file_paths_string.deinit();
-    // Get the length of the Python list
-    if (file_paths_obj == null or py.PyList_Check(file_paths_obj) == 0) {
-        py.PyErr_SetString(PyExc_ValueError, "file_paths argument must be a list of strings.");
-        return null;
-    }
+
+    // file_paths_obj is guaranteed to be a list
     const py_list_len = py.PyList_Size(file_paths_obj);
     if (py_list_len < 0) {
-        var i: isize = 0;
-        while (i < py_list_len) : (i += 1) {
-            const item = py.PyList_GetItem(file_paths_obj, i);
-            if (item == null or py.PyUnicode_Check(item) == 0) {
-                py.PyErr_SetString(PyExc_ValueError, "All items in file_paths must be strings.");
-                return null;
-            }
-            const py_bytes = py.PyUnicode_AsUTF8String(item);
-            if (py_bytes == null) {
-                py.PyErr_SetString(PyExc_ValueError, "Failed to decode file path as UTF-8.");
-                return null;
-            }
-            defer py.Py_DecRef(py_bytes);
-            const cstr = py.PyBytes_AsString(py_bytes);
-            if (cstr == null) {
-                py.PyErr_SetString(PyExc_ValueError, "Failed to extract UTF-8 bytes from file path.");
-                return null;
-            }
-            file_paths_string.append(std.mem.span(cstr)) catch {
-                py.PyErr_SetString(PyExc_ValueError, "Failed to append file path.");
-                return null;
-            };
+        py.PyErr_SetString(PyExc_ValueError, "Failed to get length of file_paths list.");
+        return null;
+    }
+    var i: isize = 0;
+    while (i < py_list_len) : (i += 1) {
+        const item = py.PyList_GetItem(file_paths_obj, i);
+        if (item == null or py.PyUnicode_Check(item) == 0) {
+            py.PyErr_SetString(PyExc_ValueError, "All items in file_paths must be strings.");
+            return null;
         }
+        const py_bytes = py.PyUnicode_AsUTF8String(item);
+        if (py_bytes == null) {
+            py.PyErr_SetString(PyExc_ValueError, "Failed to decode file path as UTF-8.");
+            return null;
+        }
+        defer py.Py_DecRef(py_bytes);
+        const cstr = py.PyBytes_AsString(py_bytes);
+        if (cstr == null) {
+            py.PyErr_SetString(PyExc_ValueError, "Failed to extract UTF-8 bytes from file path.");
+            return null;
+        }
+        const py_size = py.PyBytes_Size(py_bytes);
+        if (py_size < 0) {
+            py.PyErr_SetString(PyExc_ValueError, "Failed to get byte size of file path.");
+            return null;
+        }
+        const cstr_len = @as(usize, @intCast(py_size));
+        const path_slice = @as([*]const u8, @ptrCast(cstr))[0..cstr_len];
+
+        const owned_path = gpa.allocator().dupe(u8, path_slice) catch {
+            py.PyErr_SetString(PyExc_ValueError, "Failed to allocate memory for file path.");
+            return null;
+        };
+        file_paths_string.append(owned_path) catch {
+            py.PyErr_SetString(PyExc_ValueError, "Failed to append file path.");
+            return null;
+        };
     }
 
     const start_nanos = std.time.nanoTimestamp();
@@ -116,10 +127,13 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
     var validLicenseCounter: u8 = 0;
 
     for (file_paths_string.items) |relativeFilePath| {
+        std.debug.print("Processing file path: {s}\n", .{relativeFilePath});
+    }
+
+    for (file_paths_string.items) |relativeFilePath| {
         arrayScannedFiles.append(relativeFilePath) catch |err| {
             std.debug.print("Error appending to array: {}\n", .{err});
         };
-        if (relativeFilePath.len == 0) continue;
 
         const trimmed_path = std.mem.trim(u8, relativeFilePath, " \t\r\n");
         if (trimmed_path.len == 0) continue;
@@ -179,6 +193,11 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
     if (arrayWrongLicense.items.len > 0) {
         py.PyErr_SetString(PyExc_ValueError, "There are files that do not match the target license.");
     }
+
+    for (file_paths_string.items) |path| {
+        gpa.allocator().free(path);
+    }
+    file_paths_string.deinit();
 
     return py.PyLong_FromLong(1);
 }
