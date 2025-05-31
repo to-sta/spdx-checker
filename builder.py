@@ -15,8 +15,6 @@ class ZigBuilder(build_ext):
         is_windows = platform.system() == "Windows"
         is_macos = platform.system() == "Darwin"
 
-        
-
         cmd = [
             "zig",
             "build-lib",
@@ -34,9 +32,8 @@ class ZigBuilder(build_ext):
         if is_windows:
             cmd += ["-l", "python3"]
         elif is_macos:
-            cmd += ["-l", 'python' + PYTHON_VERSION]
+            cmd += ["-l", "python" + PYTHON_VERSION]
 
         cmd.append(ext.sources[0])
 
         self.spawn(cmd)
-

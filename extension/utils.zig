@@ -13,7 +13,7 @@ pub fn cleanFirstLine(allocator: std.mem.Allocator, args: struct { first_line: [
         }
     }
 
-    var working = temp_buf[0..idx]; // No allocation needed here
+    var working = temp_buf[0..idx];
 
     // Process comments (work with slice bounds)
     var start: usize = 0;
@@ -43,7 +43,7 @@ pub fn cleanFirstLine(allocator: std.mem.Allocator, args: struct { first_line: [
         }
     }
 
-    // Ensure start doesn't exceed end (defensive programming)
+    // Ensure start doesn't exceed end
     if (start > end) {
         start = end;
     }
@@ -60,35 +60,4 @@ pub fn cleanFirstLine(allocator: std.mem.Allocator, args: struct { first_line: [
 
     // Return a copy that the caller owns (caller must free this!)
     return allocator.dupe(u8, result);
-}
-
-/// This function prints a summary of the SPDX license check results.
-/// It displays information about the target license, scanned files,
-/// files without the correct license, and elapsed time.
-pub fn printSummary(args: struct { targetLicense: []const u8, validLicenseCounter: usize, arrayScannedFiles: std.ArrayList([]const u8), arrayWrongLicense: std.ArrayList([]const u8), startNanos: i128, endNanos: i128 }) void {
-    std.debug.print("========================================\n", .{});
-    std.debug.print("           SPDX License Checker\n", .{});
-    std.debug.print("========================================\n\n", .{});
-
-    std.debug.print("Target license: {s}\n\n", .{args.targetLicense});
-
-    std.debug.print("Scanned Files:\n", .{});
-    std.debug.print("----------------------------------------\n", .{});
-    for (args.arrayScannedFiles.items) |file_path| {
-        std.debug.print("- {s}\n", .{file_path});
-    }
-
-    std.debug.print("\nFiles Without Correct License:\n", .{});
-    std.debug.print("----------------------------------------\n", .{});
-    for (args.arrayWrongLicense.items) |file_path| {
-        std.debug.print("- {s}\n", .{file_path});
-    }
-
-    std.debug.print("\nSummary:\n", .{});
-    std.debug.print("----------------------------------------\n", .{});
-    std.debug.print("Files with correct license: {d} / {d}\n", .{ args.validLicenseCounter, args.validLicenseCounter + args.arrayWrongLicense.items.len });
-
-    const elapsedNanos = args.endNanos - args.startNanos;
-    const elapsed_millis = @divTrunc(elapsedNanos, std.time.ns_per_ms);
-    std.debug.print("\nTime elapsed: {d}ns (~ {d}ms)\n\n", .{ elapsedNanos, elapsed_millis });
 }
