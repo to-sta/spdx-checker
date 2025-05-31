@@ -40,24 +40,60 @@ fn checkIfLicenseIsValid(args: struct { target_license: []const u8 }) bool {
 fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c]PyObject {
     _ = self;
 
-    var target_license_ptr: [*:0]u8 = undefined;
-    var file_paths_string_ptr: [*:0]u8 = undefined;
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
 
-    if (py.PyArg_ParseTuple(args, "ss", &target_license_ptr, &file_paths_string_ptr) == 0) {
-        std.debug.print("Expected two string arguments: target_license, file_paths_string\n", .{});
-        py.PyErr_SetString(py.PyExc_ValueError, "Expected two string arguments: target_license, file_paths_string");
+    var target_license_ptr: [*:0]u8 = undefined;
+    var file_paths_obj: [*c]PyObject = null;
+
+    if (py.PyArg_ParseTuple(args, "sO", &target_license_ptr, &file_paths_obj) == 0) {
+        std.debug.print("Expected two arguments: target_license (str), file_paths (list)\n", .{});
+        py.PyErr_SetString(py.PyExc_ValueError, "Expected two arguments: target_license (str), file_paths (list)");
+        return null;
     }
 
     const target_license = std.mem.span(target_license_ptr);
-    const file_paths_string = std.mem.span(file_paths_string_ptr);
+
+    // file_paths_string_ptr is now a Python list object
+    var file_paths_string = std.ArrayList([]const u8).init(gpa.allocator());
+    defer file_paths_string.deinit();
+    // Get the length of the Python list
+    if (file_paths_obj == null or py.PyList_Check(file_paths_obj) == 0) {
+        py.PyErr_SetString(PyExc_ValueError, "file_paths argument must be a list of strings.");
+        return null;
+    }
+    const py_list_len = py.PyList_Size(file_paths_obj);
+    if (py_list_len < 0) {
+        var i: isize = 0;
+        while (i < py_list_len) : (i += 1) {
+            const item = py.PyList_GetItem(file_paths_obj, i);
+            if (item == null or py.PyUnicode_Check(item) == 0) {
+                py.PyErr_SetString(PyExc_ValueError, "All items in file_paths must be strings.");
+                return null;
+            }
+            const py_bytes = py.PyUnicode_AsUTF8String(item);
+            if (py_bytes == null) {
+                py.PyErr_SetString(PyExc_ValueError, "Failed to decode file path as UTF-8.");
+                return null;
+            }
+            defer py.Py_DecRef(py_bytes);
+            const cstr = py.PyBytes_AsString(py_bytes);
+            if (cstr == null) {
+                py.PyErr_SetString(PyExc_ValueError, "Failed to extract UTF-8 bytes from file path.");
+                return null;
+            }
+            file_paths_string.append(std.mem.span(cstr)) catch {
+                py.PyErr_SetString(PyExc_ValueError, "Failed to append file path.");
+                return null;
+            };
+        }
+    }
+
     const start_nanos = std.time.nanoTimestamp();
 
     const validLicense = checkIfLicenseIsValid(.{
         .target_license = target_license,
     });
-
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
 
     if (!validLicense) {
         const errorMessage = std.fmt.allocPrintZ(
@@ -78,9 +114,8 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
     var arrayWrongLicense = std.ArrayList([]const u8).init(gpa.allocator());
     defer arrayWrongLicense.deinit();
     var validLicenseCounter: u8 = 0;
-    var file_paths_iterator = std.mem.splitScalar(u8, file_paths_string, ',');
 
-    while (file_paths_iterator.next()) |relativeFilePath| {
+    for (file_paths_string.items) |relativeFilePath| {
         arrayScannedFiles.append(relativeFilePath) catch |err| {
             std.debug.print("Error appending to array: {}\n", .{err});
         };
