@@ -40,8 +40,13 @@ fn checkIfLicenseIsValid(args: struct { target_license: []const u8 }) bool {
 fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c]PyObject {
     _ = self;
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .safety = true, .thread_safe = true }){};
+    defer {
+        const leaked = gpa.deinit();
+        if (leaked == .leak) {
+            std.debug.print("MEMORY LEAK DETECTED!\n", .{});
+        }
+    }
 
     var target_license_ptr: [*:0]u8 = undefined;
     var file_paths_obj: [*c]PyObject = null;
@@ -53,10 +58,21 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
         return null;
     }
 
-    const target_license = std.mem.span(target_license_ptr);
+    const target_license_slice = std.mem.span(target_license_ptr);
+    const target_license: []const u8 = gpa.allocator().dupe(u8, target_license_slice) catch {
+        py.PyErr_SetString(py.PyExc_ValueError, "Failed to allocate memory for target_license.");
+        return null;
+    };
+    defer gpa.allocator().free(target_license);
 
     var file_paths_string = std.ArrayList([]const u8).init(gpa.allocator());
-    defer file_paths_string.deinit();
+    defer {
+        // Clean up all allocated paths first
+        for (file_paths_string.items) |path| {
+            gpa.allocator().free(path);
+        }
+        file_paths_string.deinit();
+    }
 
     // file_paths_obj is guaranteed to be a list
     const py_list_len = py.PyList_Size(file_paths_obj);
@@ -64,6 +80,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
         py.PyErr_SetString(PyExc_ValueError, "Failed to get length of file_paths list.");
         return null;
     }
+
     var i: isize = 0;
     while (i < py_list_len) : (i += 1) {
         const item = py.PyList_GetItem(file_paths_obj, i);
@@ -95,6 +112,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
             return null;
         };
         file_paths_string.append(owned_path) catch {
+            gpa.allocator().free(owned_path); // Clean up on failure
             py.PyErr_SetString(PyExc_ValueError, "Failed to append file path.");
             return null;
         };
@@ -112,27 +130,46 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
             "Invalid target license {s} provided.",
             .{target_license},
         ) catch "Invalid target license provided.";
+        defer if (!std.mem.eql(u8, errorMessage, "Invalid target license provided.")) {
+            gpa.allocator().free(errorMessage);
+        };
 
         py.PyErr_SetString(py.PyExc_ValueError, errorMessage);
-        gpa.allocator().free(errorMessage);
-
         return null;
     }
 
     const cwd = std.fs.cwd();
     var arrayScannedFiles = std.ArrayList([]const u8).init(gpa.allocator());
-    defer arrayScannedFiles.deinit();
-    var arrayWrongLicense = std.ArrayList([]const u8).init(gpa.allocator());
-    defer arrayWrongLicense.deinit();
-    var validLicenseCounter: u8 = 0;
-
-    for (file_paths_string.items) |relativeFilePath| {
-        std.debug.print("Processing file path: {s}\n", .{relativeFilePath});
+    defer {
+        // Clean up all allocated scanned file paths
+        for (arrayScannedFiles.items) |path| {
+            gpa.allocator().free(path);
+        }
+        arrayScannedFiles.deinit();
     }
 
+    var arrayWrongLicense = std.ArrayList([]const u8).init(gpa.allocator());
+    defer {
+        // Clean up all allocated wrong license file paths
+        for (arrayWrongLicense.items) |path| {
+            gpa.allocator().free(path);
+        }
+        arrayWrongLicense.deinit();
+    }
+
+    var validLicenseCounter: usize = 0;
+
     for (file_paths_string.items) |relativeFilePath| {
-        arrayScannedFiles.append(relativeFilePath) catch |err| {
+        // Store owned copy in arrayScannedFiles
+        const owned_scanned_path = gpa.allocator().dupe(u8, relativeFilePath) catch {
+            py.PyErr_SetString(py.PyExc_ValueError, "Failed to allocate memory for scanned file path.");
+            return null;
+        };
+        arrayScannedFiles.append(owned_scanned_path) catch |err| {
+            gpa.allocator().free(owned_scanned_path); // Clean up on failure
             std.debug.print("Error appending to array: {}\n", .{err});
+            py.PyErr_SetString(py.PyExc_ValueError, "Failed to append scanned file path.");
+            return null;
         };
 
         const trimmed_path = std.mem.trim(u8, relativeFilePath, " \t\r\n");
@@ -144,19 +181,28 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
                 "File {s} could not be opened.",
                 .{trimmed_path},
             ) catch "File could not be opened.";
+            defer if (!std.mem.eql(u8, errorMessage, "File could not be opened.")) {
+                gpa.allocator().free(errorMessage);
+            };
 
             py.PyErr_SetString(PyExc_ValueError, errorMessage);
-            gpa.allocator().free(errorMessage);
-
             return null;
         };
         defer file.close();
 
         var buf = std.io.bufferedReader(file.reader());
         var inStream = buf.reader();
-        const firstLineOpt = inStream.readUntilDelimiterOrEofAlloc(gpa.allocator(), '\n', 1024) catch |err| {
-            std.debug.print("Error reading file '{s}': {}\n", .{ trimmed_path, err });
-            continue;
+        const firstLineOpt = inStream.readUntilDelimiterOrEofAlloc(gpa.allocator(), '\n', 4096) catch |err| {
+            switch (err) {
+                error.StreamTooLong => {
+                    // std.debug.print("Skipping file '{s}': first line too long (likely no license header)\n", .{trimmed_path});
+                    continue; // This skips to the next file
+                },
+                else => {
+                    // std.debug.print("Error reading file '{s}': {}\n", .{ trimmed_path, err });
+                    continue;
+                },
+            }
         };
         defer if (firstLineOpt) |firstLine| gpa.allocator().free(firstLine);
 
@@ -171,8 +217,14 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
                 validLicenseCounter += 1;
                 continue;
             } else {
-                arrayWrongLicense.append(trimmed_path) catch {
-                    py.PyErr_SetString(PyExc_ValueError, "Error appending wrong license file path.");
+                // Store owned copy in arrayWrongLicense
+                const owned_wrong_path = gpa.allocator().dupe(u8, trimmed_path) catch {
+                    py.PyErr_SetString(py.PyExc_ValueError, "Failed to allocate memory for wrong license file path.");
+                    return null;
+                };
+                arrayWrongLicense.append(owned_wrong_path) catch {
+                    gpa.allocator().free(owned_wrong_path); // Clean up on failure
+                    py.PyErr_SetString(py.PyExc_ValueError, "Error appending wrong license file path.");
                     return null;
                 };
             }
@@ -180,6 +232,31 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
     }
 
     const end_nanos = std.time.nanoTimestamp();
+
+    const max_display = 30;
+    if (arrayScannedFiles.items.len > max_display or arrayWrongLicense.items.len > max_display) {
+        std.debug.print("Too many files scanned or wrong licenses found, printing only the first {d}.\n", .{max_display});
+
+        // Truncate arrayScannedFiles safely
+        if (arrayScannedFiles.items.len > max_display) {
+            // Free memory for items beyond max_display
+            for (arrayScannedFiles.items[max_display..]) |path| {
+                gpa.allocator().free(path);
+            }
+            // Resize the array to keep only the first max_display items
+            arrayScannedFiles.shrinkRetainingCapacity(max_display);
+        }
+
+        // Truncate arrayWrongLicense safely
+        if (arrayWrongLicense.items.len > max_display) {
+            // Free memory for items beyond max_display
+            for (arrayWrongLicense.items[max_display..]) |path| {
+                gpa.allocator().free(path);
+            }
+            // Resize the array to keep only the first max_display items
+            arrayWrongLicense.shrinkRetainingCapacity(max_display);
+        }
+    }
 
     utils.printSummary(.{
         .targetLicense = target_license,
@@ -194,11 +271,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
         py.PyErr_SetString(PyExc_ValueError, "There are files that do not match the target license.");
     }
 
-    for (file_paths_string.items) |path| {
-        gpa.allocator().free(path);
-    }
-    file_paths_string.deinit();
-
+    // Cleanup is handled by defer statements now
     return py.PyLong_FromLong(1);
 }
 

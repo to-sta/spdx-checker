@@ -1,6 +1,5 @@
 const std = @import("std");
 
-
 pub fn cleanFirstLine(allocator: std.mem.Allocator, args: struct { first_line: []const u8 }) ![]const u8 {
     // Remove whitespace first
     var temp_buf: [256]u8 = undefined;
@@ -14,11 +13,9 @@ pub fn cleanFirstLine(allocator: std.mem.Allocator, args: struct { first_line: [
         }
     }
 
-    // Create a working copy
-    var working = try allocator.dupe(u8, temp_buf[0..idx]);
-    defer allocator.free(working); // We'll replace this with the final result
+    var working = temp_buf[0..idx]; // No allocation needed here
 
-    // Process comments (modify working slice bounds)
+    // Process comments (work with slice bounds)
     var start: usize = 0;
     var end: usize = working.len;
 
@@ -26,20 +23,42 @@ pub fn cleanFirstLine(allocator: std.mem.Allocator, args: struct { first_line: [
         start = 2;
     } else if (std.mem.startsWith(u8, working, "/*")) {
         start = 2;
-        end = working.len - 2;
+        // Only subtract if we have enough characters
+        if (working.len >= 4) { // "/*" + at least 2 more chars for "*/"
+            end = working.len - 2;
+        } else {
+            // If string is too short, just use everything after "/*"
+            end = working.len;
+        }
     } else if (std.mem.startsWith(u8, working, "#")) {
         start = 1;
     } else if (std.mem.startsWith(u8, working, "<!--")) {
         start = 4;
-        end = working.len - 3;
+        // Only subtract if we have enough characters
+        if (working.len >= 7) { // "<!--" + at least 3 more chars for "-->"
+            end = working.len - 3;
+        } else {
+            // If string is too short, just use everything after "<!--"
+            end = working.len;
+        }
+    }
+
+    // Ensure start doesn't exceed end (defensive programming)
+    if (start > end) {
+        start = end;
     }
 
     var result = working[start..end];
     if (std.mem.startsWith(u8, result, "SPDX-License-Identifier:")) {
-        result = result[24..];
+        const spdx_prefix_len = "SPDX-License-Identifier:".len;
+        if (result.len > spdx_prefix_len) {
+            result = result[spdx_prefix_len..];
+        } else {
+            result = result[result.len..]; // Empty slice
+        }
     }
 
-    // Return a copy that the caller owns
+    // Return a copy that the caller owns (caller must free this!)
     return allocator.dupe(u8, result);
 }
 
