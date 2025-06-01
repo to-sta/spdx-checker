@@ -23,18 +23,12 @@ const PyLong_FromLong = py.PyLong_FromLong;
 extern var PyExc_ValueError: [*c]py.PyObject;
 
 fn checkIfLicenseIsValid(args: struct { target_license: []const u8 }) bool {
-    var is_target_license_valid = false;
     for (spdx_licenses) |spdx_license| {
         if (std.mem.eql(u8, args.target_license, spdx_license)) {
-            is_target_license_valid = true;
-            break;
+            return true;
         }
     }
-    if (!is_target_license_valid) {
-        std.debug.print("Error: Target license '{s}' is not a recognized SPDX license.\n", .{args.target_license});
-        return false;
-    }
-    return true;
+    return false;
 }
 
 fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c]PyObject {
@@ -56,8 +50,18 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
         return null;
     }
 
-    const target_license_slice = std.mem.span(target_license_ptr);
+    // Copy the license string from Python memory to Zig memory
+    const license_len = std.mem.len(target_license_ptr);
+    const target_license_slice = gpa.allocator().dupe(u8, target_license_ptr[0..license_len]) catch {
+        py.PyErr_SetString(PyExc_ValueError, "Failed to allocate memory for target license.");
+        return null;
+    };
+    defer gpa.allocator().free(target_license_slice);
 
+    if (!checkIfLicenseIsValid(.{ .target_license = target_license_slice })) {
+        py.PyErr_SetString(PyExc_ValueError, "Invalid target license.");
+        return null;
+    }
 
     var file_paths_string = std.ArrayList([]const u8).init(gpa.allocator());
     defer {
@@ -114,8 +118,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
     var checked_files: usize = 0;
     var files_with_license: usize = 0;
     var line_buffer: [4096]u8 = undefined;
-   
-    
+
     for (file_paths_string.items) |file_path| {
         const trimmed_path = std.mem.trim(u8, file_path, " \t\r\n");
 
@@ -147,7 +150,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
             const elapsed_ms = @divTrunc(end_nanos - start_nanos, std.time.ns_per_ms);
             checked_files += 1;
             std.debug.print("Files with license '{s}': {d} / {d} Files\n", .{ target_license_slice, files_with_license, checked_files });
-            std.debug.print("License check completed in ({d}ns) {d}ms \n", .{end_nanos - start_nanos, elapsed_ms});
+            std.debug.print("License check completed in ({d}ns) {d}ms \n", .{ end_nanos - start_nanos, elapsed_ms });
             return null;
         }
         checked_files += 1;
@@ -157,7 +160,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
     const elapsed_ms = @divTrunc(end_nanos - start_nanos, std.time.ns_per_ms);
 
     std.debug.print("Files with license '{s}': {d} / {d} Files\n", .{ target_license_slice, files_with_license, checked_files });
-    std.debug.print("License check completed in ({d}ns) {d}ms \n", .{end_nanos - start_nanos, elapsed_ms});
+    std.debug.print("License check completed in ({d}ns) {d}ms \n", .{ end_nanos - start_nanos, elapsed_ms });
 
     return py.PyLong_FromLong(@intCast(files_with_license));
 }
@@ -206,17 +209,12 @@ var Methods = [_]PyMethodDef{
 };
 
 const ModuleBase = extern struct {
-     ob_refcnt: u64 = 1,
-     ob_type: ?*u8 = null,
+    ob_refcnt: u64 = 1,
+    ob_type: ?*u8 = null,
 };
 
 var module = PyModuleDef{
-    .m_base = PyModuleDef_Base{
-        .ob_base = @as(PyObject, @bitCast(ModuleBase{})),
-        .m_init = null,
-        .m_index = 0,
-        .m_copy = null,
-    },
+    .m_base = std.mem.zeroes(PyModuleDef_Base), // Safe zero initialization
     .m_name = "spdx_checker",
     .m_doc = null,
     .m_size = -1,
