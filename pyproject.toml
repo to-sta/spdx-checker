@@ -1,6 +1,6 @@
 [project]
 name = "spdx_checker"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = ["setuptools"]
 description = "Fast SPDX License Checker for Source Code"
 readme = "README.md"
