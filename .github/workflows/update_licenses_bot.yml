@@ -29,8 +29,8 @@ jobs:
       - name: Install dependencies with uv
         run: uv sync --dev
 
-      - name: Run license_scraper.py
-        run: python automation/license_scraper.py
+      - name: Run license_scraper.py with uv
+        run: uv run python automation/license_scraper.py
 
       - name: Check for changes
         id: git-check
