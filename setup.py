@@ -11,5 +11,5 @@ setup(
     long_description=(Path(__file__).parent / "README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
     py_modules=["builder"],
-    python_requires=">=3.13",
+    python_requires=">=3.11",
 )
