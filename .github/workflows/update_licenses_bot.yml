@@ -30,7 +30,7 @@ jobs:
         run: uv sync --dev
 
       - name: Run license_scraper.py
-        run: python license_scraper.py
+        run: python automation/license_scraper.py
 
       - name: Check for changes
         id: git-check
