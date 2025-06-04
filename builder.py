@@ -2,10 +2,8 @@ import os
 import sysconfig
 import platform
 from setuptools.command.build_ext import build_ext
-import dotenv
 import re
 
-dotenv.load_dotenv()
 
 INSTALL_BASE = sysconfig.get_config_var("installed_base")
 LIB_DIR = sysconfig.get_config_var("LIBDIR")
@@ -20,8 +18,6 @@ if LIB_DIR is None:
 # Zig Targets to build for different platforms
 # <cpu-arch>-<os>-<abi>
 CIBW_BUILD = os.getenv("CIBW_BUILD")
-
-import re
 
 
 def get_zig_target_triple_from_CIBW(cibw_build: str) -> str:
@@ -95,6 +91,11 @@ class ZigBuilder(build_ext):
         if CIBW_BUILD:
             # CIBW_BUILD is set, so we are building in a CI environment
             cmd += ["-target", get_zig_target_triple_from_CIBW(CIBW_BUILD)]
+        else:
+            raise ValueError(
+                "CIBW_BUILD environment variable is not set. "
+                "This script is intended to be run in a CI environment."
+            )
 
         if is_windows:
             cmd += ["-l", "python3"]
