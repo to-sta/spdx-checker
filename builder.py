@@ -17,10 +17,11 @@ if LIB_DIR is None:
 
 # Zig Targets to build for different platforms
 # <cpu-arch>-<os>-<abi>
-CIBW_BUILD = os.getenv("CIBW_BUILD")
+CIBW_ARCH = os.getenv("CIBW_ARCH")
+# CIBW_PLATFORM = os.getenv("CIBW_PLATFORM")
 
 
-def get_zig_target_triple_from_CIBW(cibw_build: str) -> str:
+def get_zig_target_triple_from_CIBW() -> str:
     """
     Get the Zig target triple from the CIBW_BUILD environment variable.
     This is used to determine the target architecture and OS for building.
@@ -38,9 +39,6 @@ def get_zig_target_triple_from_CIBW(cibw_build: str) -> str:
     This function will translate the CIBW_BUILD format to the Zig target triple format.
     E.g. "cp311-macosx_arm64" -> "aarch64-macos-gnu".
 
-    Parameters
-    ----------
-    cibw_build (str): The CIBW_BUILD environment variable value.
 
     Returns
     -------
@@ -51,22 +49,27 @@ def get_zig_target_triple_from_CIBW(cibw_build: str) -> str:
     ValueError: If the CIBW_BUILD format is invalid.
     """
 
-    match = re.match(r"cp\d{2,}-([a-zA-Z0-9]+)_([a-zA-Z0-9_]+)", cibw_build)
-    if not match:
-        raise ValueError(f"Invalid CIBW_BUILD format: {cibw_build}")
-    os_part = match.group(1)
-    arch_part = match.group(2)
+    platform = os.environ.get("CIBW_PLATFORM")
+    arch = os.environ.get("CIBW_ARCH")
 
-    os_map = {"macosx": "macos", "linux": "linux", "win": "windows"}
-    zig_os = os_map.get(os_part, os_part)
+    if platform is None or arch is None:
+        raise RuntimeError("CIBW_PLATFORM or CIBW_ARCH not set")
 
-    # Always use aarch64 for arm on macos
-    if zig_os == "macos" and arch_part in ("arm64", "arm"):
-        zig_arch = "aarch64"
-    else:
-        zig_arch = arch_part
+    arch_map = {
+        "x86_64": "x86_64",
+        "i686": "x86",
+        "aarch64": "aarch64",
+    }
+    os_map = {
+        "windows": "windows",
+        "linux": "linux",
+        "macos": "macos",
+    }
 
-    return f"{zig_arch}-{zig_os}-gnu"
+    zig_arch = arch_map.get(arch, arch)
+    zig_os = os_map.get(platform, platform)
+
+    return f"{zig_arch}-{zig_os}"
 
 
 class ZigBuilder(build_ext):
@@ -88,9 +91,9 @@ class ZigBuilder(build_ext):
             f"-femit-bin={self.get_ext_fullpath(ext.name)}",
         ]
 
-        if CIBW_BUILD:
+        if CIBW_ARCH:
             # CIBW_BUILD is set, so we are building in a CI environment
-            cmd += ["-target", get_zig_target_triple_from_CIBW(CIBW_BUILD)]
+            cmd += ["-target", get_zig_target_triple_from_CIBW()]
         else:
             raise ValueError(
                 "CIBW_BUILD environment variable is not set. "
