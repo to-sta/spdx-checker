@@ -6,58 +6,8 @@ on:
       - "[0-9]+.[0-9]+.[0-9]+a[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+b[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+rc[0-9]+"
-# env:
-#   CIBW_BUILD_FRONTEND: "build[uv]"
-#   CIBW_BEFORE_ALL_LINUX: |
-#     curl -L https://ziglang.org/download/0.14.0/zig-linux-x86_64-0.14.0.tar.xz | tar -xJ
-#     mkdir -p /opt/zig
-#     cp -r zig-linux-x86_64-0.14.0/* /opt/zig
-#   CIBW_ENVIRONMENT_LINUX: "PATH=/opt/zig:$PATH"
-#   CIBW_ENVIRONMENT_MACOS: "PATH=${{ github.workspace }}/zig-bin:$PATH MACOSX_DEPLOYMENT_TARGET=14.7"
-#   CIBW_ENVIRONMENT_WINDOWS: PATH=${{ github.workspace }}/zig-bin:$PATH
-#   CIBW_BUILD: "cp311-macosx_x86_64 cp311-macosx_arm64 cp312-macosx_x86_64 cp312-macosx_arm64 cp313-macosx_x86_64 cp313-macosx_arm64 cp311-manylinux_x86_64 cp312-manylinux_x86_64 cp313-manylinux_x86_64 cp311-musllinux_x86_64 cp312-musllinux_x86_64 cp313-musllinux_x86_64 cp313-win_amd64"
 
 jobs:
-  # build_wheels:
-  #   name: Build wheels on ${{ matrix.os }}
-  #   runs-on: ${{ matrix.os }}
-  #   continue-on-error: true
-  #   strategy:
-  #     matrix:
-  #       os: [ubuntu-latest, windows-latest, macos-latest]
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Set up Zig
-  #       if: runner.os != 'Linux'
-  #       uses: mlugg/setup-zig@v2
-  #       with:
-  #         version: 0.14.0
-
-  #     - name: Symlink Zig to local bin (Linux/macOS)
-  #       if: runner.os != 'Windows'
-  #       run: |
-  #         mkdir -p $GITHUB_WORKSPACE/zig-bin
-  #         ln -s $(which zig) $GITHUB_WORKSPACE/zig-bin/zig
-
-  #     - name: Copy Zig to local bin (Windows)
-  #       if: runner.os == 'Windows'
-  #       shell: pwsh
-  #       run: |
-  #         $zig = (Get-Command zig).Source
-  #         $binDir = "$env:GITHUB_WORKSPACE\\zig-bin"
-  #         New-Item -ItemType Directory -Path $binDir -Force | Out-Null
-  #         Copy-Item -Path $zig -Destination "$binDir\\zig.exe"
-
-  #     - name: Install uv
-  #       uses: astral-sh/setup-uv@v4
-  #     - name: Build wheels
-  #       uses: pypa/cibuildwheel@v2.23.3
-  #     - name: Upload artifacts
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: cibw-wheels-${{ matrix.os }}
-  #         path: ./wheelhouse/*.whl
-
   build_macos_wheels:
     name: Build MacOS wheel
     runs-on: macos-latest ]
