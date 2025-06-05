@@ -107,7 +107,7 @@ class ZigBuilder(build_ext):
 
         if CIBW_BUILD:
             # CIBW_BUILD is set, so we are building in a CI environment
-            cmd += ["-target", get_zig_target_triple_from_CIBW()]
+            cmd += ["-target", get_zig_target_triple_from_CIBW(cibw_build=CIBW_BUILD)]
         else:
             raise ValueError(
                 "CIBW_BUILD environment variable is not set. "
