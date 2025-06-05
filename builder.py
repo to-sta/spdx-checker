@@ -2,7 +2,6 @@ import os
 import sysconfig
 import platform
 from setuptools.command.build_ext import build_ext
-import re
 
 
 INSTALL_BASE = sysconfig.get_config_var("installed_base")
@@ -17,11 +16,11 @@ if LIB_DIR is None:
 
 # Zig Targets to build for different platforms
 # <cpu-arch>-<os>-<abi>
-CIBW_ARCH = os.getenv("CIBW_ARCH")
+CIBW_BUILD = os.getenv("CIBW_BUILD")
 # CIBW_PLATFORM = os.getenv("CIBW_PLATFORM")
 
 
-def get_zig_target_triple_from_CIBW() -> str:
+def get_zig_target_triple_from_CIBW(cibw_build: str) -> str:
     """
     Get the Zig target triple from the CIBW_BUILD environment variable.
     This is used to determine the target architecture and OS for building.
@@ -48,26 +47,41 @@ def get_zig_target_triple_from_CIBW() -> str:
     -------
     ValueError: If the CIBW_BUILD format is invalid.
     """
+    if not cibw_build:
+        raise ValueError("CIBW_BUILD is not set or empty")
 
-    platform = os.environ.get("CIBW_PLATFORM")
-    arch = os.environ.get("CIBW_ARCH")
+    # Match patterns like cp311-macosx_arm64 or cp36-manylinux_x86_64
+    # Split based on '-' and then '_'
+    try:
+        _, os_arch = cibw_build.split("-", 1)
+        os_part, arch_part = os_arch.split("_", 1)
+    except ValueError:
+        raise ValueError(f"Invalid CIBW_BUILD format: {cibw_build}")
 
-    if platform is None or arch is None:
-        raise RuntimeError("CIBW_PLATFORM or CIBW_ARCH not set")
-
+    # Map CIBW arch to Zig arch
     arch_map = {
         "x86_64": "x86_64",
+        "amd64": "x86_64",
         "i686": "x86",
+        "arm64": "aarch64",
         "aarch64": "aarch64",
     }
+    # Map CIBW OS to Zig OS
     os_map = {
-        "windows": "windows",
+        "manylinux": "linux",
         "linux": "linux",
-        "macos": "macos",
+        "macosx": "macos",
+        "win": "windows",
+        "windows": "windows",
     }
 
-    zig_arch = arch_map.get(arch, arch)
-    zig_os = os_map.get(platform, platform)
+    if arch_part not in arch_map:
+        raise ValueError(f"Unknown architecture: {arch_part}")
+    if os_part not in os_map:
+        raise ValueError(f"Unknown OS: {os_part}")
+
+    zig_arch = arch_map[arch_part]
+    zig_os = os_map[os_part]
 
     return f"{zig_arch}-{zig_os}"
 
@@ -91,7 +105,7 @@ class ZigBuilder(build_ext):
             f"-femit-bin={self.get_ext_fullpath(ext.name)}",
         ]
 
-        if CIBW_ARCH:
+        if CIBW_BUILD:
             # CIBW_BUILD is set, so we are building in a CI environment
             cmd += ["-target", get_zig_target_triple_from_CIBW()]
         else:
