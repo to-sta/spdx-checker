@@ -38,7 +38,7 @@ class ZigBuilder(build_ext):
             cmd += ["-l", "python3"]
         elif is_macos:
             cmd += ["-l", "python" + PYTHON_VERSION]
-            cmd += ["-undefined dynamic_lookup"]
+            cmd += ["-fallow-shlib-undefined"]
 
         cmd.append(ext.sources[0])
 

@@ -2,7 +2,6 @@ const std = @import("std");
 const py = @cImport({
     @cDefine("Py_LIMITED_API", "0x030D0000");
     @cDefine("PY_SSIZE_T_CLEAN", {});
-
     @cInclude("Python.h");
 });
 const print = std.debug.print;
@@ -34,11 +33,11 @@ fn checkIfLicenseIsValid(args: struct { target_license: []const u8 }) bool {
 fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c]PyObject {
     _ = self;
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{ .safety = true, .thread_safe = true }){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .safety = false, .thread_safe = true }){};
     defer {
         const leaked = gpa.deinit();
         if (leaked == .leak) {
-            std.debug.print("MEMORY LEAK DETECTED!\n", .{});
+            print("MEMORY LEAK DETECTED!\n", .{});
         }
     }
 
@@ -76,7 +75,8 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
         py.PyErr_SetString(PyExc_ValueError, "Failed to get length of file_paths list.");
         return null;
     }
-    var i: isize = 0;
+
+    var i: py.Py_ssize_t = 0;
     while (i < py_list_len) : (i += 1) {
         const item = py.PyList_GetItem(file_paths_obj, i);
         if (item == null or py.PyUnicode_Check(item) == 0) {
@@ -117,7 +117,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
 
     var checked_files: usize = 0;
     var files_with_license: usize = 0;
-    var line_buffer: [4096]u8 = undefined;
+    var line_buffer: [8192]u8 = undefined;
 
     for (file_paths_string.items) |file_path| {
         const trimmed_path = std.mem.trim(u8, file_path, " \t\r\n");
@@ -125,14 +125,14 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
         if (trimmed_path.len == 0) continue;
 
         const file = cwd.openFile(trimmed_path, .{}) catch {
-            std.debug.print("Could not open file: {s}\n", .{trimmed_path});
+            print("Could not open file: {s}\n", .{trimmed_path});
             continue;
         };
         defer file.close();
 
         // Read first line directly into buffer (no allocation)
         const bytes_read = file.reader().readAll(&line_buffer) catch {
-            std.debug.print("Error reading file: {s}\n", .{trimmed_path});
+            print("Error reading file: {s}\n", .{trimmed_path});
             continue;
         };
 
@@ -144,13 +144,13 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
         if (std.mem.indexOf(u8, first_line, target_license_slice) != null) {
             files_with_license += 1;
         } else {
-            std.debug.print("File '{s}' does not match target license '{s}'.\n", .{ trimmed_path, target_license_slice });
+            print("File '{s}' does not match target license '{s}'.\n", .{ trimmed_path, target_license_slice });
             py.PyErr_SetString(PyExc_ValueError, "File does not match target license.");
             const end_nanos = std.time.nanoTimestamp();
             const elapsed_ms = @divTrunc(end_nanos - start_nanos, std.time.ns_per_ms);
             checked_files += 1;
-            std.debug.print("Files with license '{s}': {d} / {d} Files\n", .{ target_license_slice, files_with_license, checked_files });
-            std.debug.print("License check completed in ({d}ns) {d}ms \n", .{ end_nanos - start_nanos, elapsed_ms });
+            print("Files with license '{s}': {d} / {d} Files\n", .{ target_license_slice, files_with_license, checked_files });
+            print("License check completed in ({d}ns) {d}ms \n", .{ end_nanos - start_nanos, elapsed_ms });
             return null;
         }
         checked_files += 1;
@@ -159,8 +159,8 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
     const end_nanos = std.time.nanoTimestamp();
     const elapsed_ms = @divTrunc(end_nanos - start_nanos, std.time.ns_per_ms);
 
-    std.debug.print("Files with license '{s}': {d} / {d} Files\n", .{ target_license_slice, files_with_license, checked_files });
-    std.debug.print("License check completed in ({d}ns) {d}ms \n", .{ end_nanos - start_nanos, elapsed_ms });
+    print("Files with license '{s}': {d} / {d} Files\n", .{ target_license_slice, files_with_license, checked_files });
+    print("License check completed in ({d}ns) {d}ms \n", .{ end_nanos - start_nanos, elapsed_ms });
 
     return py.PyLong_FromLong(@intCast(files_with_license));
 }
