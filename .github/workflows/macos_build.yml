@@ -23,20 +23,16 @@ jobs:
 
             - name: Set up Python environment and install package
               run: |
-                uv venv --python 3.11
+                uv venv --python 3.13
                 source .venv/bin/activate
                 uv pip install -e .
             
-            - name: Run tests (expect failure)
+            - name: Run tests
               run: |
                 source .venv/bin/activate
-                if python tests/test_spdx_checker.py; then
-                  echo "Test unexpectedly passed! Failing the workflow."
-                  exit 1
-                else
-                  echo "Test failed as expected."
-                fi
+                python tests/test_spdx_checker.py
 
+            # New wheel building steps
             - name: Install wheel building dependencies
               run: |
                 source .venv/bin/activate
@@ -50,26 +46,27 @@ jobs:
             - name: Repair wheel with delocate
               run: |
                 source .venv/bin/activate
-                delocate-wheel -v ./wheelhouse/*.whl
+                delocate-wheel -v dist/*.whl
 
             - name: Test wheel installation
               run: |
-                uv venv test-env --python 3.11
+                # Create a fresh environment to test the wheel
+                uv venv test-env --python 3.13
                 source test-env/bin/activate
-                pip install ./wheelhouse/*.whl
+                pip install dist/*.whl
+                
+                # Test that the package imports correctly
                 python -c "import spdx_checker; print('Wheel installation successful!')"
-                if python tests/test_spdx_checker.py; then
-                  echo "Test unexpectedly passed! Failing the workflow."
-                  exit 1
-                else
-                  echo "Test failed as expected."
-                fi
+                
+                # Optionally run your tests against the wheel installation
+                python tests/test_spdx_checker.py
 
             - name: List wheel contents (for debugging)
               run: |
                 source .venv/bin/activate
-                python -m zipfile -l ./wheelhouse/*.whl
+                python -m zipfile -l dist/*.whl
 
+            # Optional: Upload wheel as artifact for inspection
             - name: Upload wheel as artifact
               uses: actions/upload-artifact@v4
               with:
