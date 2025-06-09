@@ -88,11 +88,6 @@ jobs:
                 echo "=== Checking bundled libraries ==="
                 unzip -l wheelhouse/*.whl | grep -E '\.(dylib|so)'
 
-            - name: Upload wheel as artifact
-              uses: actions/upload-artifact@v4
-              with:
-                name: macos-wheel
-                path: ./wheelhouse/*.whl
 
             - name: Extract and check .so file
               run: |
