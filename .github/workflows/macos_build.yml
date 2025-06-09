@@ -61,7 +61,7 @@ jobs:
                 source .venv/bin/activate
                 export MACOSX_DEPLOYMENT_TARGET=14.7
                 export ARCHFLAGS="-arch arm64"
-                delocate-wheel -w wheelhouse -v --require-archs arm64 dist/*.whl
+                delocate-wheel -w wheelhouse -v --require-archs arm64 --exclude "*/Python" --exclude "*/libpython*.dylib" dist/*.whl
 
             - name: Test wheel installation (with DYLD_PRINT_LIBRARIES - Post-Delocate)
               run: |
