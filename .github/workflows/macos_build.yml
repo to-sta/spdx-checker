@@ -55,6 +55,49 @@ jobs:
                 python -X faulthandler -c "import spdx_checker; print('Imported successfully (pre-delocate)')"
                 #  Optional: verbose test output
                 python -v tests/test_spdx_checker.py || true  # Allow failure for debug
+            
+            
+            - name: Inspect delocated .so with otool -L
+              run: |
+                set -x # Enable command echoing for debugging
+                # Find the delocated wheel file (assuming only one .whl file in wheelhouse/)
+                WHEEL_FILE=$(find wheelhouse -name "*.whl")
+                echo "Found delocated wheel: $WHEEL_FILE"
+
+                # Create a temporary directory to unpack the wheel
+                UNPACK_DIR=$(mktemp -d delocated-wheel-XXXX)
+                echo "Unpacking wheel to: $UNPACK_DIR"
+                unzip -q "$WHEEL_FILE" -d "$UNPACK_DIR"
+
+                # Find the .so file within the unpacked directory
+                # Adjust this path if spdx_checker.abi3.so is located differently within your package structure
+                SO_FILE=$(find "$UNPACK_DIR" -name "spdx_checker.abi3.so")
+                if [ -z "$SO_FILE" ]; then
+                echo "Error: spdx_checker.abi3.so not found in unpacked wheel!"
+                echo "Contents of unpacked directory:"
+                ls -R "$UNPACK_DIR"
+                exit 1
+                fi
+                echo "Found .so file: $SO_FILE"
+
+                echo "--- Output of otool -L ---"
+                otool -L "$SO_FILE"
+                echo "--- End of otool -L output ---"
+
+                # Clean up the temporary directory
+                rm -rf "$UNPACK_DIR"
+
+            - name: Inspect delocated wheel with delocate-listdeps
+              run: |
+                set -x # Enable command echoing for debugging
+                source .venv/bin/activate # Activate venv so delocate-listdeps is found
+                echo "--- Output of delocate-listdeps ---"
+                delocate-listdeps wheelhouse/*.whl
+                echo "--- End of delocate-listdeps output ---"
+
+
+
+
 
             - name: Repair wheel with delocate
               run: |
