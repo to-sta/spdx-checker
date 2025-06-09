@@ -115,6 +115,20 @@ jobs:
 
             # ... (rest of your workflow) ...
 
+            - name: List installed Python packages
+              run: |
+                set -x
+                source .venv/bin/activate
+                echo "--- Installed Python Packages ---"
+                pip list # or uv pip list if that's what you prefer to use for listing
+                echo "--- End of Installed Python Packages ---"
+
+            - name: Run tests with DYLD_PRINT_LIBRARIES (post-delocate)
+              run: |
+                set -x
+                export DYLD_PRINT_LIBRARIES=1
+                python -X faulthandler -v tests/test_spdx_checker.py
+
 
             # - name: Repair wheel with delocate
             #   run: |
