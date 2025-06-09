@@ -137,10 +137,10 @@ jobs:
             #     export ARCHFLAGS="-arch arm64"
             #     delocate-wheel -w wheelhouse -v --require-archs arm64 --exclude "*/Python" --exclude "*/libpython*.dylib" dist/*.whl
 
+
             - name: Test wheel installation (with DYLD_PRINT_LIBRARIES - Post-Delocate)
               run: |
-                uv venv test-env --python 3.11
-                source test-env/bin/activate
+                source .venv/bin/activate
                 uv pip install --force-reinstall --no-deps wheelhouse/*.whl
 
                 echo "Running import with DYLD_PRINT_LIBRARIES (post-delocate)"
