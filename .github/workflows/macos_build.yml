@@ -125,6 +125,11 @@ jobs:
                   # Try to get more info about the crash
                   dmesg | tail -10 || echo "Could not get system crash info"
                 }
+                python tests/test_spdx_checker.py || {
+                  echo "=== TEST CRASH DETECTED ==="
+                  echo "Getting crash info..."
+                  dmesg | tail -10 || echo "Could not get system crash info"
+                }
 
             - name: Upload wheel as artifact
               uses: actions/upload-artifact@v4
