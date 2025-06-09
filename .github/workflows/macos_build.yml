@@ -86,7 +86,7 @@ jobs:
                 delocate-listdeps wheelhouse/*.whl
                 
                 echo "=== Checking bundled libraries ==="
-                unzip -l wheelhouse/*.whl | grep -E '\.(dylib|so)
+                unzip -l wheelhouse/*.whl | grep -E '\.(dylib|so)'
 
             - name: Upload wheel as artifact
               uses: actions/upload-artifact@v4
