@@ -61,7 +61,20 @@ jobs:
                 source .venv/bin/activate
                 export MACOSX_DEPLOYMENT_TARGET=14.7
                 export ARCHFLAGS="-arch arm64"
-                delocate-wheel -w wheelhouse -v --require-archs arm64 --ignore-missing-dependencies dist/*.whl
+                delocate-wheel -w wheelhouse -v --require-archs arm64 dist/*.whl
+
+            - name: Test wheel installation (with DYLD_PRINT_LIBRARIES - Post-Delocate)
+              run: |
+                uv venv test-env --python 3.11
+                source test-env/bin/activate
+                uv pip install --force-reinstall --no-deps wheelhouse/*.whl
+
+                echo "Running import with DYLD_PRINT_LIBRARIES (post-delocate)"
+                DYLD_PRINT_LIBRARIES=1 python -X faulthandler -c "import spdx_checker; print('Wheel installation successful!')"
+
+                echo "Running tests with DYLD_PRINT_LIBRARIES (post-delocate)"
+                # This is where the crash occurs, so focus here
+                DYLD_PRINT_LIBRARIES=1 python -X faulthandler -v tests/test_spdx_checker.py || true
             
             - name: Re-check .so linkage after delocate
               continue-on-error: true

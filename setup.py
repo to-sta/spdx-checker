@@ -3,7 +3,7 @@ from pathlib import Path
 
 from builder import ZigBuilder
 
-spdx_checker = Extension(name="spdx_checker", sources=["extension/main.zig"])
+spdx_checker = Extension(name="spdx_checker", sources=["extension/main.zig"], py_limited_api=True)
 
 setup(
     ext_modules=[spdx_checker],
