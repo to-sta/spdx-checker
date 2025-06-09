@@ -43,6 +43,7 @@ jobs:
                 source .venv/bin/activate
                 # Set deployment target to match the actual minimum requirement
                 export MACOSX_DEPLOYMENT_TARGET=14.7
+                export ARCHFLAGS="-arch arm64"
                 python -m build --wheel
 
             - name: Repair wheel with delocate
@@ -50,6 +51,7 @@ jobs:
                 source .venv/bin/activate
                 # Set deployment target to match the actual minimum requirement
                 export MACOSX_DEPLOYMENT_TARGET=14.7
+                export ARCHFLAGS="-arch arm64"
                 delocate-wheel -w wheelhouse -v dist/*.whl
 
             - name: Test wheel installation
@@ -58,7 +60,7 @@ jobs:
                 uv venv test-env --python 3.11
                 source test-env/bin/activate
                 # Use --force-reinstall --no-deps to bypass platform checks if needed
-                pip install --force-reinstall --no-deps wheelhouse/*.whl
+                uv pip install --force-reinstall --no-deps wheelhouse/*.whl
                 
                 # Test that the package imports correctly
                 python -c "import spdx_checker; print('Wheel installation successful!')"
