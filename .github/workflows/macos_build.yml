@@ -23,7 +23,7 @@ jobs:
 
             - name: Set up Python environment and install package
               run: |
-                uv venv --python 3.11
+                uv venv --python 3.13
                 source .venv/bin/activate
                 uv pip install -e .
             
@@ -94,7 +94,7 @@ jobs:
 
             - name: Test wheel installation with debugging
               run: |
-                uv venv test-env --python 3.11
+                uv venv test-env --python 3.13
                 source test-env/bin/activate
                 
                 echo "=== Python version check ==="
