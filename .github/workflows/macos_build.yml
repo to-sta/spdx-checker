@@ -126,6 +126,7 @@ jobs:
             - name: Run tests with DYLD_PRINT_LIBRARIES (post-delocate)
               run: |
                 set -x
+                source .venv/bin/activate
                 export DYLD_PRINT_LIBRARIES=1
                 python -X faulthandler -v tests/test_spdx_checker.py
 
@@ -161,23 +162,6 @@ jobs:
                 ls -lh wheelhouse/*.whl
 
 
-            - name: Test wheel installation (with DYLD_PRINT_LIBRARIES - Post-Delocate)
-              run: |
-                source .venv/bin/activate
-                uv pip install --force-reinstall --no-deps dist/*.whl
-
-                echo "Running import with DYLD_PRINT_LIBRARIES (post-delocate)"
-                DYLD_PRINT_LIBRARIES=1 python -X faulthandler -c "import spdx_checker; print('Wheel installation successful!')"
-
-                echo "Running tests with DYLD_PRINT_LIBRARIES (post-delocate)"
-                # This is where the crash occurs, so focus here
-                DYLD_PRINT_LIBRARIES=1 python -X faulthandler -v tests/test_spdx_checker.py || true
-            
-            - name: Re-check .so linkage after delocate
-              continue-on-error: true
-              run: |
-                unzip -d repaired-wheel wheelhouse/*.whl
-                find repaired-wheel -name "*.so" -exec otool -L {} \; | grep -i python || echo "No Python dylib linked"
             
             # NEW: Inspect wheel linkage
             - name: Inspect wheel linkage with delocate-listdeps
