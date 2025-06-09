@@ -92,8 +92,10 @@ jobs:
               uses: actions/upload-artifact@v4
               with:
                 name: macos-wheel
-                path: ./wheelhouse/*.whl || echo "No bundled libraries found"
-                
+                path: ./wheelhouse/*.whl
+
+            - name: Extract and check .so file
+              run: |
                 echo "=== Extracting and checking .so file ==="
                 unzip -q wheelhouse/*.whl -d temp-wheel
                 find temp-wheel -name "*.so" -exec otool -L {} \;
