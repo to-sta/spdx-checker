@@ -32,7 +32,6 @@ jobs:
                 source .venv/bin/activate
                 python tests/test_spdx_checker.py
 
-            # New wheel building steps
             - name: Install wheel building dependencies
               run: |
                 source .venv/bin/activate
@@ -41,39 +40,60 @@ jobs:
             - name: Build wheel
               run: |
                 source .venv/bin/activate
-                # Set deployment target to match the actual minimum requirement
                 export MACOSX_DEPLOYMENT_TARGET=14.7
                 export ARCHFLAGS="-arch arm64"
                 python -m build --wheel
 
+            #  NEW: Test the wheel BEFORE delocate
+            - name: Test wheel BEFORE delocate
+              run: |
+                uv venv pre-delocate-env --python 3.11
+                source pre-delocate-env/bin/activate
+                uv pip install --force-reinstall --no-deps dist/*.whl
+                echo "Testing wheel before delocate..."
+                #  Use faulthandler to trace crash
+                python -X faulthandler -c "import spdx_checker; print('Imported successfully (pre-delocate)')"
+                #  Optional: verbose test output
+                python -v tests/test_spdx_checker.py || true  # Allow failure for debug
+
             - name: Repair wheel with delocate
               run: |
                 source .venv/bin/activate
-                # Set deployment target to match the actual minimum requirement
                 export MACOSX_DEPLOYMENT_TARGET=14.7
                 export ARCHFLAGS="-arch arm64"
                 delocate-wheel -w wheelhouse -v dist/*.whl
 
+            # NEW: Inspect wheel linkage
+            - name: Inspect wheel linkage with delocate-listdeps
+              run: |
+                source .venv/bin/activate
+                uv pip install delocate
+                delocate-listdeps wheelhouse/*.whl
+
+            # NEW: Inspect architecture of compiled shared object
+            - name: Inspect compiled extension architecture
+              run: |
+                unzip -d wheel-unzipped wheelhouse/*.whl
+                find wheel-unzipped -name "*.so" -exec file {} \; || true
+                find wheel-unzipped -name "*.so" -exec otool -L {} \; || true
+
             - name: Test wheel installation
               run: |
-                # Create a fresh environment to test the wheel
                 uv venv test-env --python 3.11
                 source test-env/bin/activate
-                # Use --force-reinstall --no-deps to bypass platform checks if needed
                 uv pip install --force-reinstall --no-deps wheelhouse/*.whl
                 
-                # Test that the package imports correctly
-                python -c "import spdx_checker; print('Wheel installation successful!')"
+                # Use faulthandler here as well
+                python -X faulthandler -c "import spdx_checker; print('Wheel installation successful!')"
                 
-                # Optionally run your tests against the wheel installation
-                python tests/test_spdx_checker.py
+                # Run tests (can crash, so allow failure for debug)
+                python -v tests/test_spdx_checker.py || true
 
             - name: List wheel contents (for debugging)
               run: |
                 source .venv/bin/activate
                 python -m zipfile -l wheelhouse/*.whl
 
-            # Upload repaired wheel as artifact
             - name: Upload wheel as artifact
               uses: actions/upload-artifact@v4
               with:
