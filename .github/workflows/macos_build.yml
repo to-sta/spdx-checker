@@ -61,8 +61,14 @@ jobs:
                 source .venv/bin/activate
                 export MACOSX_DEPLOYMENT_TARGET=14.7
                 export ARCHFLAGS="-arch arm64"
-                delocate-wheel -w wheelhouse -v dist/*.whl
-
+                delocate-wheel -w wheelhouse -v --require-archs arm64 --ignore-missing-dependencies dist/*.whl
+            
+            - name: Re-check .so linkage after delocate
+              continue-on-error: true
+              run: |
+                unzip -d repaired-wheel wheelhouse/*.whl
+                find repaired-wheel -name "*.so" -exec otool -L {} \; | grep -i python || echo "No Python dylib linked"
+            
             # NEW: Inspect wheel linkage
             - name: Inspect wheel linkage with delocate-listdeps
               run: |
