@@ -36,9 +36,10 @@ class ZigBuilder(build_ext):
 
         if is_windows:
             cmd += ["-l", "python3"]
-        # elif is_macos:
-        #     cmd += ["-l", "python" + PYTHON_VERSION]
-        #     cmd += ["-fallow-shlib-undefined"]
+        elif is_macos:
+            cmd += ["-l", "python" + PYTHON_VERSION]
+            cmd += ["-t", "aarch64-macos"]
+            cmd += ["-fallow-shlib-undefined"]
 
         cmd.append(ext.sources[0])
 
