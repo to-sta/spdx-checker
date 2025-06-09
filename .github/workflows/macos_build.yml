@@ -27,10 +27,15 @@ jobs:
                 source .venv/bin/activate
                 uv pip install -e .
             
-            - name: Run tests
+            - name: Run tests (expect failure)
               run: |
                 source .venv/bin/activate
-                python tests/test_spdx_checker.py
+                if python tests/test_spdx_checker.py; then
+                  echo "Test unexpectedly passed! Failing the workflow."
+                  exit 1
+                else
+                  echo "Test failed as expected."
+                fi
 
             - name: Install wheel building dependencies
               run: |
@@ -53,7 +58,12 @@ jobs:
                 source test-env/bin/activate
                 pip install ./wheelhouse/*.whl
                 python -c "import spdx_checker; print('Wheel installation successful!')"
-                python tests/test_spdx_checker.py
+                if python tests/test_spdx_checker.py; then
+                  echo "Test unexpectedly passed! Failing the workflow."
+                  exit 1
+                else
+                  echo "Test failed as expected."
+                fi
 
             - name: List wheel contents (for debugging)
               run: |
