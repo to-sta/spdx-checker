@@ -52,7 +52,7 @@ jobs:
                 source .venv/bin/activate
                 export MACOSX_DEPLOYMENT_TARGET=14.7
                 export ARCHFLAGS="-arch arm64"
-                uv pip install . --no-deps --no-build-isolation --wheel --wheel-dir dist
+                uv build --wheel
                 echo "--- Contents of dist/ after build ---"
                 ls -lR dist
                 echo "--- End of dist/ contents ---"
