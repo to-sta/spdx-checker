@@ -130,12 +130,35 @@ jobs:
                 python -X faulthandler -v tests/test_spdx_checker.py
 
 
-            # - name: Repair wheel with delocate
-            #   run: |
-            #     source .venv/bin/activate
-            #     export MACOSX_DEPLOYMENT_TARGET=14.7
-            #     export ARCHFLAGS="-arch arm64"
-            #     delocate-wheel -w wheelhouse -v --require-archs arm64 --exclude "*/Python" --exclude "*/libpython*.dylib" dist/*.whl
+            - name: Repair wheel with delocate (with exclusions)
+              run: |
+                set -x
+                source .venv/bin/activate
+                export MACOSX_DEPLOYMENT_TARGET=14.7
+                export ARCHFLAGS="-arch arm64"
+                delocate-wheel -w wheelhouse -v \
+                  --require-archs arm64 \
+                  --exclude libSystem.B.dylib \
+                  --exclude libpython3.11.dylib \
+                  dist/*.whl
+
+            - name: Verify delocate success
+              run: |
+                set -x
+                source .venv/bin/activate
+                
+                # Check if wheelhouse was created and contains files
+                if [ ! -d "wheelhouse" ] || [ -z "$(ls -A wheelhouse)" ]; then
+                  echo "ERROR: wheelhouse directory is empty or doesn't exist"
+                  echo "delocate-wheel likely failed silently"
+                  exit 1
+                fi
+                
+                # Compare file sizes
+                echo "Original wheel size:"
+                ls -lh dist/*.whl
+                echo "Repaired wheel size:"
+                ls -lh wheelhouse/*.whl
 
 
             - name: Test wheel installation (with DYLD_PRINT_LIBRARIES - Post-Delocate)
