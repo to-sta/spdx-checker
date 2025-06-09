@@ -41,11 +41,13 @@ jobs:
             - name: Build wheel
               run: |
                 source .venv/bin/activate
+                export MACOSX_DEPLOYMENT_TARGET=10.9
                 python -m build --wheel
 
             - name: Repair wheel with delocate
               run: |
                 source .venv/bin/activate
+                export MACOSX_DEPLOYMENT_TARGET=10.9
                 delocate-wheel -w wheelhouse -v dist/*.whl
 
             - name: Test wheel installation
