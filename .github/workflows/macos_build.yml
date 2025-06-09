@@ -23,8 +23,11 @@ jobs:
 
             - name: Set up Python environment and install package
               run: |
-                uv venv --python 3.13
+                uv venv --python 3.11
                 source .venv/bin/activate
+                # Verify we're using the correct Python version
+                python --version
+                which python
                 uv pip install -e .
             
             - name: Run tests
@@ -48,17 +51,23 @@ jobs:
               run: |
                 source .venv/bin/activate
                 
+                # Verify Python version in build environment
+                echo "=== Build environment Python version ==="
+                python --version
+                which python
+                
                 # First check what libraries the original wheel needs
                 echo "=== Original wheel dependencies ==="
                 delocate-listdeps dist/*.whl
                 
-                # Try repair with different flags
-                echo "=== Attempting repair with --dylibs-only ==="
-                delocate-wheel -w wheelhouse-alt -v --dylibs-only --require-archs arm64 dist/*.whl || true
-                
-                # If that fails, try without architecture requirements
-                echo "=== Attempting basic repair ==="
-                delocate-wheel -w wheelhouse -v dist/*.whl
+                # IMPORTANT: Exclude Python framework to prevent version conflicts
+                echo "=== Repairing wheel (excluding Python framework) ==="
+                delocate-wheel -w wheelhouse -v \
+                  --require-archs arm64 \
+                  --exclude "*/Python.framework/*" \
+                  --exclude "*/libpython*.dylib" \
+                  --exclude "*/Python" \
+                  dist/*.whl
                 
                 # Show what we ended up with
                 echo "=== Final wheel dependencies ==="
@@ -83,10 +92,8 @@ jobs:
               uses: actions/upload-artifact@v4
               with:
                 name: macos-wheel
-                path: ./wheelhouse/*.whl
-
-            - name: Extract and check .so file
-              run: |
+                path: ./wheelhouse/*.whl || echo "No bundled libraries found"
+                
                 echo "=== Extracting and checking .so file ==="
                 unzip -q wheelhouse/*.whl -d temp-wheel
                 find temp-wheel -name "*.so" -exec otool -L {} \;
@@ -94,7 +101,7 @@ jobs:
 
             - name: Test wheel installation with debugging
               run: |
-                uv venv test-env --python 3.13
+                uv venv test-env --python 3.11
                 source test-env/bin/activate
                 
                 echo "=== Python version check ==="
