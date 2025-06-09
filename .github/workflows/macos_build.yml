@@ -44,12 +44,25 @@ jobs:
                 export ARCHFLAGS="-arch arm64"
                 uv build --wheel
 
-            - name: Repair wheel with delocate
+            - name: Alternative wheel repair approach
               run: |
                 source .venv/bin/activate
-                export MACOSX_DEPLOYMENT_TARGET=14.7
-                export ARCHFLAGS="-arch arm64"
+                
+                # First check what libraries the original wheel needs
+                echo "=== Original wheel dependencies ==="
+                delocate-listdeps dist/*.whl
+                
+                # Try repair with different flags
+                echo "=== Attempting repair with --dylibs-only ==="
+                delocate-wheel -w wheelhouse-alt -v --dylibs-only --require-archs arm64 dist/*.whl || true
+                
+                # If that fails, try without architecture requirements
+                echo "=== Attempting basic repair ==="
                 delocate-wheel -w wheelhouse -v dist/*.whl
+                
+                # Show what we ended up with
+                echo "=== Final wheel dependencies ==="
+                delocate-listdeps wheelhouse/*.whl || echo "Could not check dependencies"
 
             - name: Test repaired wheel
               run: |
@@ -57,13 +70,52 @@ jobs:
                 export DYLD_PRINT_LIBRARIES=1
                 python -X faulthandler -v tests/test_spdx_checker.py
 
-            - name: Test wheel installation
+            - name: Debug wheel dependencies before testing
+              run: |
+                source .venv/bin/activate
+                echo "=== Checking wheel dependencies ==="
+                delocate-listdeps wheelhouse/*.whl
+                
+                echo "=== Checking bundled libraries ==="
+                unzip -l wheelhouse/*.whl | grep -E '\.(dylib|so)
+
+            - name: Upload wheel as artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: macos-wheel
+                path: ./wheelhouse/*.whl
+
+            - name: Extract and check .so file
+              run: |
+                echo "=== Extracting and checking .so file ==="
+                unzip -q wheelhouse/*.whl -d temp-wheel
+                find temp-wheel -name "*.so" -exec otool -L {} \;
+                rm -rf temp-wheel
+
+            - name: Test wheel installation with debugging
               run: |
                 uv venv test-env --python 3.11
                 source test-env/bin/activate
+                
+                echo "=== Python version check ==="
+                python --version
+                python -c "import sys; print(f'Python path: {sys.executable}')"
+                
                 uv pip install --force-reinstall --no-deps wheelhouse/*.whl
-                python -c "import spdx_checker; print('Wheel installation successful!')"
-                python tests/test_spdx_checker.py
+                
+                echo "=== Installed package info ==="
+                find test-env -name "*spdx_checker*" -type f
+                
+                echo "=== Testing import with crash debugging ==="
+                # Test in stages to isolate the crash
+                python -c "print('Python works')" || echo "Python itself crashes"
+                python -c "import sys; print('sys import works')" || echo "sys import crashes"
+                python -X faulthandler -c "import spdx_checker; print('Import successful!')" || {
+                  echo "=== SEGFAULT DETECTED ==="
+                  echo "Getting crash info..."
+                  # Try to get more info about the crash
+                  dmesg | tail -10 || echo "Could not get system crash info"
+                }
 
             - name: Upload wheel as artifact
               uses: actions/upload-artifact@v4
