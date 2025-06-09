@@ -34,7 +34,6 @@ jobs:
                 uv pip install -e .
             
             - name: Test the build
-              working-directory: ./tests
               run: |
-                python test_spdx_checker.py
+                uv run tests/test_spdx_checker.py
             
