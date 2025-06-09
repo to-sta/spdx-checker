@@ -1,0 +1,31 @@
+name: MacOS Build
+on: push
+jobs:
+    build_and_test:
+        runs-on: macos-14
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+            
+            - name: Set up Zig
+              uses: mlugg/setup-zig@v2
+              with:
+                version: 0.14.0
+            
+            - name: Symlink Zig to local bin
+              run: |
+                mkdir -p $GITHUB_WORKSPACE/zig-bin
+                ln -s $(which zig) $GITHUB_WORKSPACE/zig-bin/zig
+            
+            - name: Install uv
+              uses: astral-sh/setup-uv@v4
+            
+            - name: Install build dependencies
+              run: |
+                uv pip install -e .
+            
+            - name: Test the build
+              working-directory: $GITHUB_WORKSPACE/tests
+              run: |
+                python test_spdx_checker.py
+            
