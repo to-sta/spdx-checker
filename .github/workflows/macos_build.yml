@@ -141,7 +141,7 @@ jobs:
             - name: Test wheel installation (with DYLD_PRINT_LIBRARIES - Post-Delocate)
               run: |
                 source .venv/bin/activate
-                uv pip install --force-reinstall --no-deps wheelhouse/*.whl
+                uv pip install --force-reinstall --no-deps dist/*.whl
 
                 echo "Running import with DYLD_PRINT_LIBRARIES (post-delocate)"
                 DYLD_PRINT_LIBRARIES=1 python -X faulthandler -c "import spdx_checker; print('Wheel installation successful!')"
