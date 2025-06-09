@@ -41,13 +41,15 @@ jobs:
             - name: Build wheel
               run: |
                 source .venv/bin/activate
-                export MACOSX_DEPLOYMENT_TARGET=10.9
+                # Set deployment target to match the actual minimum requirement
+                export MACOSX_DEPLOYMENT_TARGET=14.7
                 python -m build --wheel
 
             - name: Repair wheel with delocate
               run: |
                 source .venv/bin/activate
-                export MACOSX_DEPLOYMENT_TARGET=10.9
+                # Set deployment target to match the actual minimum requirement
+                export MACOSX_DEPLOYMENT_TARGET=14.7
                 delocate-wheel -w wheelhouse -v dist/*.whl
 
             - name: Test wheel installation
