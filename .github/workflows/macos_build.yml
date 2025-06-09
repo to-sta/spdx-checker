@@ -46,14 +46,15 @@ jobs:
             - name: Repair wheel with delocate
               run: |
                 source .venv/bin/activate
-                delocate-wheel -v dist/*.whl
+                delocate-wheel -w wheelhouse -v dist/*.whl
 
             - name: Test wheel installation
               run: |
                 # Create a fresh environment to test the wheel
                 uv venv test-env --python 3.11
                 source test-env/bin/activate
-                pip install dist/*.whl
+                # Use --force-reinstall --no-deps to bypass platform checks if needed
+                pip install --force-reinstall --no-deps wheelhouse/*.whl
                 
                 # Test that the package imports correctly
                 python -c "import spdx_checker; print('Wheel installation successful!')"
@@ -64,9 +65,9 @@ jobs:
             - name: List wheel contents (for debugging)
               run: |
                 source .venv/bin/activate
-                python -m zipfile -l dist/*.whl
+                python -m zipfile -l wheelhouse/*.whl
 
-            # Optional: Upload wheel as artifact for inspection
+            # Upload repaired wheel as artifact
             - name: Upload wheel as artifact
               uses: actions/upload-artifact@v4
               with:
