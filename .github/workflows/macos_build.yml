@@ -37,32 +37,50 @@ jobs:
                 source .venv/bin/activate
                 uv pip install build wheel delocate
 
-            - name: Build wheel
+            # - name: Build wheel
+            #   run: |
+            #     source .venv/bin/activate
+            #     export MACOSX_DEPLOYMENT_TARGET=14.7
+            #     export ARCHFLAGS="-arch arm64"
+            #     uv build --wheel
+
+            # ... (your existing setup steps) ...
+
+            - name: Build wheel (ARM64 only)
               run: |
+                set -x
                 source .venv/bin/activate
                 export MACOSX_DEPLOYMENT_TARGET=14.7
                 export ARCHFLAGS="-arch arm64"
-                uv build --wheel
+                uv pip install . --no-deps --no-build-isolation --wheel --wheel-dir dist
+                echo "--- Contents of dist/ after build ---"
+                ls -lR dist
+                echo "--- End of dist/ contents ---"
 
-            #  NEW: Test the wheel BEFORE delocate
-            - name: Test wheel BEFORE delocate
+            - name: Repair wheel with delocate (DEBUG - NO IGNORE)
               run: |
-                uv venv pre-delocate-env --python 3.11
-                source pre-delocate-env/bin/activate
-                uv pip install --force-reinstall --no-deps dist/*.whl
-                echo "Testing wheel before delocate..."
-                #  Use faulthandler to trace crash
-                python -X faulthandler -c "import spdx_checker; print('Imported successfully (pre-delocate)')"
-                #  Optional: verbose test output
-                python -v tests/test_spdx_checker.py || true  # Allow failure for debug
-            
-            
+                set -x
+                source .venv/bin/activate
+                export MACOSX_DEPLOYMENT_TARGET=14.7
+                export ARCHFLAGS="-arch arm64"
+                delocate-wheel -w wheelhouse -v dist/*.whl
+                # Add inspection after delocate-wheel
+                echo "--- Contents of wheelhouse/ after delocate ---"
+                ls -lR wheelhouse || true # Use || true to prevent failure if directory doesn't exist
+                echo "--- End of wheelhouse/ contents ---"
+
             - name: Inspect delocated .so with otool -L
               run: |
-                set -x # Enable command echoing for debugging
+                set -x
                 # Find the delocated wheel file (assuming only one .whl file in wheelhouse/)
                 WHEEL_FILE=$(find wheelhouse -name "*.whl")
                 echo "Found delocated wheel: $WHEEL_FILE"
+
+                # Ensure WHEEL_FILE is not empty before proceeding
+                if [ -z "$WHEEL_FILE" ]; then
+                  echo "Error: No wheel file found in wheelhouse/."
+                  exit 1
+                fi
 
                 # Create a temporary directory to unpack the wheel
                 UNPACK_DIR=$(mktemp -d delocated-wheel-XXXX)
@@ -73,10 +91,10 @@ jobs:
                 # Adjust this path if spdx_checker.abi3.so is located differently within your package structure
                 SO_FILE=$(find "$UNPACK_DIR" -name "spdx_checker.abi3.so")
                 if [ -z "$SO_FILE" ]; then
-                echo "Error: spdx_checker.abi3.so not found in unpacked wheel!"
-                echo "Contents of unpacked directory:"
-                ls -R "$UNPACK_DIR"
-                exit 1
+                  echo "Error: spdx_checker.abi3.so not found in unpacked wheel!"
+                  echo "Contents of unpacked directory:"
+                  ls -R "$UNPACK_DIR"
+                  exit 1
                 fi
                 echo "Found .so file: $SO_FILE"
 
@@ -89,22 +107,21 @@ jobs:
 
             - name: Inspect delocated wheel with delocate-listdeps
               run: |
-                set -x # Enable command echoing for debugging
-                source .venv/bin/activate # Activate venv so delocate-listdeps is found
+                set -x
+                source .venv/bin/activate
                 echo "--- Output of delocate-listdeps ---"
                 delocate-listdeps wheelhouse/*.whl
                 echo "--- End of delocate-listdeps output ---"
 
+            # ... (rest of your workflow) ...
 
 
-
-
-            - name: Repair wheel with delocate
-              run: |
-                source .venv/bin/activate
-                export MACOSX_DEPLOYMENT_TARGET=14.7
-                export ARCHFLAGS="-arch arm64"
-                delocate-wheel -w wheelhouse -v --require-archs arm64 --exclude "*/Python" --exclude "*/libpython*.dylib" dist/*.whl
+            # - name: Repair wheel with delocate
+            #   run: |
+            #     source .venv/bin/activate
+            #     export MACOSX_DEPLOYMENT_TARGET=14.7
+            #     export ARCHFLAGS="-arch arm64"
+            #     delocate-wheel -w wheelhouse -v --require-archs arm64 --exclude "*/Python" --exclude "*/libpython*.dylib" dist/*.whl
 
             - name: Test wheel installation (with DYLD_PRINT_LIBRARIES - Post-Delocate)
               run: |
