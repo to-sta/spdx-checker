@@ -620,6 +620,7 @@ pub const licensesIdentfiers = [_][]const u8{
 	"SSPL-1.0",
 	"StandardML-NJ",
 	"SugarCRM-1.1.3",
+	"SUL-1.0",
 	"Sun-PPP",
 	"Sun-PPP-2000",
 	"SunPro",
