@@ -29,15 +29,18 @@ class ZigBuilder(build_ext):
             "ReleaseFast",
             "-I",
             INCLUDE_DIR,
-            "-L",
-            LIB_DIR,
+            #"-L",
+            #LIB_DIR,
             f"-femit-bin={self.get_ext_fullpath(ext.name)}",
         ]
 
         if is_windows:
-            cmd += ["-l", "python3"]
+            cmd += ["-L", LIB_DIR, "-l", "python3"]
+            # cmd += ["-l", "python3"]
         elif is_macos:
-            cmd += ["-l", "python" + PYTHON_VERSION]
+            cmd += ["-target", "aarch64-macos.11.0"]
+            cmd += ["-fallow-shlib-undefined"]
+            # cmd += ["-l", "python" + PYTHON_VERSION]
 
         cmd.append(ext.sources[0])
 

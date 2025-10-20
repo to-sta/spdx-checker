@@ -30,7 +30,7 @@ fn checkIfLicenseIsValid(args: struct { target_license: []const u8 }) bool {
     return false;
 }
 
-fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c]PyObject {
+fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c]PyObject {
     _ = self;
 
     var gpa = std.heap.GeneralPurposeAllocator(.{ .safety = false, .thread_safe = true }){};
@@ -40,6 +40,8 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
             print("MEMORY LEAK DETECTED!\n", .{});
         }
     }
+
+    const allocator = gpa.allocator();
 
     var target_license_ptr: [*:0]u8 = undefined;
     var file_paths_obj: [*c]PyObject = null;
@@ -51,23 +53,23 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
 
     // Copy the license string from Python memory to Zig memory
     const license_len = std.mem.len(target_license_ptr);
-    const target_license_slice = gpa.allocator().dupe(u8, target_license_ptr[0..license_len]) catch {
+    const target_license_slice = allocator.dupe(u8, target_license_ptr[0..license_len]) catch {
         py.PyErr_SetString(PyExc_ValueError, "Failed to allocate memory for target license.");
         return null;
     };
-    defer gpa.allocator().free(target_license_slice);
+    defer allocator.free(target_license_slice);
 
     if (!checkIfLicenseIsValid(.{ .target_license = target_license_slice })) {
         py.PyErr_SetString(PyExc_ValueError, "Invalid target license.");
         return null;
     }
 
-    var file_paths_string = std.ArrayList([]const u8).init(gpa.allocator());
+    var file_paths_string = std.ArrayList([]const u8).initCapacity(allocator, 128) catch {
+        py.PyErr_SetString(py.PyExc_MemoryError, "Failed to allocate memory for file paths list.");
+        return null;
+    };
     defer {
-        for (file_paths_string.items) |path| {
-            gpa.allocator().free(path);
-        }
-        file_paths_string.deinit();
+        file_paths_string.deinit(allocator);
     }
 
     const py_list_len = py.PyList_Size(file_paths_obj);
@@ -106,7 +108,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
             py.PyErr_SetString(PyExc_ValueError, "Failed to allocate memory for file path.");
             return null;
         };
-        file_paths_string.append(owned_path) catch {
+        file_paths_string.append(allocator, owned_path) catch {
             py.PyErr_SetString(PyExc_ValueError, "Failed to append file path.");
             return null;
         };
@@ -131,7 +133,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.C) [*c
         defer file.close();
 
         // Read first line directly into buffer (no allocation)
-        const bytes_read = file.reader().readAll(&line_buffer) catch {
+        const bytes_read = file.read(line_buffer[0..]) catch {
             print("Error reading file: {s}\n", .{trimmed_path});
             continue;
         };
