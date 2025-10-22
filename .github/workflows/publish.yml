@@ -57,38 +57,10 @@ jobs:
         with:
           name: cibw-wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
-
-  build_macos_wheels:
-    name: Build MacOS wheel
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.15.2
-        
-      - name: Symlink Zig to local bin
-        run: |
-          mkdir -p $GITHUB_WORKSPACE/zig-bin
-          ln -s $(which zig) $GITHUB_WORKSPACE/zig-bin/zig
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-      - name: Build wheels
-        uses: pypa/cibuildwheel@v2.23.3
-        env: 
-          CIBW_ENVIRONMENT_MACOS: "PATH=${{ github.workspace }}/zig-bin:$PATH MACOSX_DEPLOYMENT_TARGET=14.7"
-          CIBW_BUILD: cp312-macosx_arm64
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: cibw-wheels-${{ github.run_id }}
-          path: ./wheelhouse/*.whl
            
   pypi_publish:
     name: Upload release to PyPI
-    needs: [build_macos_wheels, build_wheels]
+    needs: [build_wheels]
     runs-on: ubuntu-latest
     environment:
       name: release
