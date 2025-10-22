@@ -9,7 +9,7 @@ on:
 env:
   CIBW_BUILD_FRONTEND: "build[uv]"
   CIBW_BEFORE_ALL_LINUX: |
-    curl -L https://ziglang.org/download/0.15.2/zig-linux-x86_64-0.15.2.tar.xz | tar -xJ
+    curl -L https://ziglang.org/download/0.15.2/zig-x86_64-linux-0.15.2.tar.xz | tar -xJ
     mkdir -p /opt/zig
     cp -r zig-linux-x86_64-0.15.2/* /opt/zig
   CIBW_ENVIRONMENT_LINUX: "PATH=/opt/zig:$PATH"
@@ -88,7 +88,7 @@ jobs:
            
   pypi_publish:
     name: Upload release to PyPI
-    needs: [build_macos_wheels]
+    needs: [build_macos_wheels, build_wheels]
     runs-on: ubuntu-latest
     environment:
       name: release
