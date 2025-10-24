@@ -11,5 +11,6 @@ setup(
     long_description=(Path(__file__).parent / "README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
     py_modules=["builder"],
+    package_data={"": ["*.pyi", "py.typed"]},  # Include stub files and type marker
     python_requires=">=3.11",
 )

@@ -1,0 +1,4 @@
+include spdx_checker.pyi
+include py.typed
+include README.md
+include LICENSE
