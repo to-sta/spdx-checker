@@ -1,4 +1,4 @@
-include spdx_checker.pyi
-include py.typed
+recursive-include spdx_checker *.pyi
+recursive-include spdx_checker py.typed
 include README.md
 include LICENSE
