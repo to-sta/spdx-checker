@@ -6,7 +6,7 @@ This stub file provides type hints for the Zig-compiled spdx_checker extension.
 
 def check_license(target_license: str, file_paths: list[str]) -> int:
     """
-    Checks against a list of allowed SPDX Licenses and then checks each file's 
+    Checks against a list of allowed SPDX Licenses and then checks each file's
     first line against the target license.
 
     Parameters
