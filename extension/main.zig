@@ -1,6 +1,6 @@
 const std = @import("std");
 const py = @cImport({
-    @cDefine("Py_LIMITED_API", "0x03070000");
+    @cDefine("Py_LIMITED_API", "0x03080000");
     @cDefine("PY_SSIZE_T_CLEAN", {});
     @cInclude("Python.h");
 });
@@ -81,7 +81,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
     var i: py.Py_ssize_t = 0;
     while (i < py_list_len) : (i += 1) {
         const item = py.PyList_GetItem(file_paths_obj, i);
-        if (item == null or py.PyUnicode_Check(item) == 0) {
+        if (item == null or py.PyUnicode_Check(item) == false) {
             py.PyErr_SetString(PyExc_ValueError, "All items in file_paths must be strings.");
             return null;
         }
