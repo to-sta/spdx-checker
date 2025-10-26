@@ -27,7 +27,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies with uv
-        run: uv sync --dev
+        run: uv pip install httpx
 
       - name: Run license_scraper.py with uv
         run: uv run python automation/license_scraper.py
