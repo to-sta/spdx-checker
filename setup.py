@@ -14,6 +14,6 @@ setup(
     long_description_content_type="text/markdown",
     packages=["spdx_checker"],
     package_data={"spdx_checker": ["py.typed", "__init__.pyi"]},
-    python_requires=">=3.7",
+    python_requires=">=3.11",
     options={"bdist_wheel": {"py_limited_api": "cp38"}},
 )

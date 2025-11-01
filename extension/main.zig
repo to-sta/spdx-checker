@@ -2,14 +2,6 @@ const std = @import("std");
 const py = @cImport({
     @cDefine("Py_LIMITED_API", "0x03080000");
     @cDefine("PY_SSIZE_T_CLEAN", {});
-    // Inform the C preprocessor (and Python headers) that <crypt.h> is not available.
-    //
-    // Some build environments—especially on Linux—may detect or assume the presence
-    // of crypt.h and enable code paths that require it. Defining HAVE_CRYPT_H as 0
-    // forces conditional checks like `#if HAVE_CRYPT_H` to evaluate false, avoiding
-    // attempts to include <crypt.h> or use related APIs (and preventing linker
-    // requirements such as libcrypt).
-    @cDefine("HAVE_CRYPT_H", "0");  
     @cInclude("Python.h");
 });
 const print = std.debug.print;
