@@ -81,7 +81,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
     var i: py.Py_ssize_t = 0;
     while (i < py_list_len) : (i += 1) {
         const item = py.PyList_GetItem(file_paths_obj, i);
-        if (item == null or py.PyUnicode_Check(item) == false) {
+        if (item == null or py.PyUnicode_Check(item) == 0) {
             py.PyErr_SetString(PyExc_ValueError, "All items in file_paths must be strings.");
             return null;
         }
