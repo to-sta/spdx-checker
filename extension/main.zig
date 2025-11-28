@@ -54,7 +54,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
     const stdout = &stdout_writer.interface;
     defer stdout.flush() catch {};
 
-    stdout.print("{s}spdx_checker {s}v0.1.11{s}\n\n", .{Colors.Bold, Colors.Purple, Colors.Reset}) catch {};
+    stdout.print("{s}spdx_checker {s}v0.1.15{s}\n\n", .{Colors.Bold, Colors.Purple, Colors.Reset}) catch {};
     stdout.print("{s}Parsed Arguments:{s}\n\n", .{Colors.Bold, Colors.Reset}) catch {};
     stdout.print("\tTarget License:\t\t{s}\"{s}\"{s}\n", .{Colors.Blue, parsed_args.target_license, Colors.Reset}) catch {};
     stdout.print("\tFix Mode:\t\t{s}{}{s}\n", .{Colors.Blue, parsed_args.fix, Colors.Reset}) catch {};

@@ -1,6 +1,6 @@
 [project]
 name = "spdx_checker"
-version = "0.1.12"
+version = "0.1.15"
 dependencies = [
     "setuptools",
 ]
