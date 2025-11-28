@@ -18,7 +18,12 @@ The wheels published by the GitHub Actions workflow are built with cibuildwheel.
 ```python
 import spdx_checker
 
-spdx_checker.check_license("MIT", ["example1.py", "example2.svelte", "example3.html"])
+spdx_checker.check_license(
+    "MIT", 
+    ["example1.py", "example2.svelte", "example3.html"]
+    True,
+    False
+    )
 ```
 
 ## Development
