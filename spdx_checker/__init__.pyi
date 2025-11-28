@@ -34,3 +34,5 @@ def check_license(target_license: str, file_paths: list[str], fix: bool = False,
     2
     """
     ...
+
+__all__ = ["check_license"]

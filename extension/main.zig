@@ -1,5 +1,4 @@
 const std = @import("std");
-<<<<<<< HEAD
 const py = @import("python.zig").py;
 const ParseError = @import("errors.zig").ParseError;
 const Colors = @import("utils.zig").Colors;
@@ -152,9 +151,6 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
         return null;
     }
 
-    // Return None on success
-    const none = py.Py_GetConstantBorrowed(py.Py_CONSTANT_NONE);
-    py.Py_IncRef(none);
     return py.PyLong_FromLong(0);
 }
 
