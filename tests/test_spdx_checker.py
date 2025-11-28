@@ -1,6 +1,7 @@
 import spdx_checker
 import unittest
 
+
 class TestSpdxChecker(unittest.TestCase):
     def test_check_license_raises_value_error(self):
         with self.assertRaises(ValueError):
@@ -13,6 +14,7 @@ class TestSpdxChecker(unittest.TestCase):
                     "tests/first/second/third/fourth/example.css",
                 ],
             )
+
 
 if __name__ == "__main__":
     unittest.main()
