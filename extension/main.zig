@@ -1,14 +1,11 @@
 const std = @import("std");
-const py = @cImport({
-    @cDefine("Py_LIMITED_API", "0x030D0000");
-    @cDefine("PY_SSIZE_T_CLEAN", {});
-    @cInclude("Python.h");
-});
-const print = std.debug.print;
-
+const py = @import("python.zig").py;
+const ParseError = @import("errors.zig").ParseError;
+const Colors = @import("utils.zig").Colors;
 const utils = @import("utils.zig");
-const spdx_licenses = @import("licenses.zig").licensesIdentfiers;
+const parse = @import("parse.zig");
 
+// Aliases for Python C API types and functions
 const PyObject = py.PyObject;
 const PyMethodDef = py.PyMethodDef;
 const PyModuleDef = py.PyModuleDef;
@@ -18,123 +15,86 @@ const PyModule_Create = py.PyModule_Create;
 const METH_NOARGS = py.METH_NOARGS;
 const PyArg_ParseTuple = py.PyArg_ParseTuple;
 const PyLong_FromLong = py.PyLong_FromLong;
-
 extern var PyExc_ValueError: [*c]py.PyObject;
-
-fn checkIfLicenseIsValid(args: struct { target_license: []const u8 }) bool {
-    for (spdx_licenses) |spdx_license| {
-        if (std.mem.eql(u8, args.target_license, spdx_license)) {
-            return true;
-        }
-    }
-    return false;
-}
 
 fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c]PyObject {
     _ = self;
 
     var gpa = std.heap.GeneralPurposeAllocator(.{ .safety = false, .thread_safe = true }){};
-    defer {
-        const leaked = gpa.deinit();
-        if (leaked == .leak) {
-            print("MEMORY LEAK DETECTED!\n", .{});
-        }
-    }
+    defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
 
-    var target_license_ptr: [*:0]u8 = undefined;
-    var file_paths_obj: [*c]PyObject = null;
-
-    if (py.PyArg_ParseTuple(args, "sO!", &target_license_ptr, &py.PyList_Type, &file_paths_obj) == 0) {
-        py.PyErr_SetString(py.PyExc_ValueError, "Expected two arguments: target_license (str), file_paths (list)");
-        return null;
-    }
-
-    // Copy the license string from Python memory to Zig memory
-    const license_len = std.mem.len(target_license_ptr);
-    const target_license_slice = allocator.dupe(u8, target_license_ptr[0..license_len]) catch {
-        py.PyErr_SetString(PyExc_ValueError, "Failed to allocate memory for target license.");
+    var parsed_args = parse.Arguments.parse(args, allocator) catch |err| {
+        // Return null on error, because Python exception is already set.
+        switch (err) {
+            ParseError.ParseFailed => {
+                py.PyErr_SetString(PyExc_ValueError, "Failed to parse arguments");
+            },
+            ParseError.InvalidList => {
+                py.PyErr_SetString(PyExc_ValueError, "Invalid list provided");
+            },
+            ParseError.InvalidListItem => {
+                py.PyErr_SetString(PyExc_ValueError, "Invalid list item");
+            },
+            ParseError.InvalidString => {
+                py.PyErr_SetString(PyExc_ValueError, "Expected list of strings");
+            },
+            ParseError.OutOfMemory => {
+                py.PyErr_SetString(PyExc_ValueError, "Out of memory");
+            },
+        }
         return null;
     };
-    defer allocator.free(target_license_slice);
+    defer parsed_args.deinit();
 
-    if (!checkIfLicenseIsValid(.{ .target_license = target_license_slice })) {
-        py.PyErr_SetString(PyExc_ValueError, "Invalid target license.");
-        return null;
-    }
+    // Allocate a buffer for stdout
+    var stdout_buffer: [4096]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+    defer stdout.flush() catch {};
 
-    var file_paths_string = std.ArrayList([]const u8).initCapacity(allocator, 128) catch {
-        py.PyErr_SetString(py.PyExc_MemoryError, "Failed to allocate memory for file paths list.");
-        return null;
-    };
-    defer {
-        file_paths_string.deinit(allocator);
-    }
-
-    const py_list_len = py.PyList_Size(file_paths_obj);
-    if (py_list_len < 0) {
-        py.PyErr_SetString(PyExc_ValueError, "Failed to get length of file_paths list.");
-        return null;
-    }
-
-    var i: py.Py_ssize_t = 0;
-    while (i < py_list_len) : (i += 1) {
-        const item = py.PyList_GetItem(file_paths_obj, i);
-        if (item == null or py.PyUnicode_Check(item) == 0) {
-            py.PyErr_SetString(PyExc_ValueError, "All items in file_paths must be strings.");
-            return null;
-        }
-        const py_bytes = py.PyUnicode_AsUTF8String(item);
-        if (py_bytes == null) {
-            py.PyErr_SetString(PyExc_ValueError, "Failed to decode file path as UTF-8.");
-            return null;
-        }
-        defer py.Py_DecRef(py_bytes);
-        const cstr = py.PyBytes_AsString(py_bytes);
-        if (cstr == null) {
-            py.PyErr_SetString(PyExc_ValueError, "Failed to extract UTF-8 bytes from file path.");
-            return null;
-        }
-        const py_size = py.PyBytes_Size(py_bytes);
-        if (py_size < 0) {
-            py.PyErr_SetString(PyExc_ValueError, "Failed to get byte size of file path.");
-            return null;
-        }
-        const cstr_len = @as(usize, @intCast(py_size));
-        const path_slice = @as([*]const u8, @ptrCast(cstr))[0..cstr_len];
-
-        const owned_path = gpa.allocator().dupe(u8, path_slice) catch {
-            py.PyErr_SetString(PyExc_ValueError, "Failed to allocate memory for file path.");
-            return null;
-        };
-        file_paths_string.append(allocator, owned_path) catch {
-            py.PyErr_SetString(PyExc_ValueError, "Failed to append file path.");
-            return null;
-        };
-    }
+    stdout.print("{s}spdx_checker {s}v0.1.11{s}\n\n", .{Colors.Bold, Colors.Purple, Colors.Reset}) catch {};
+    stdout.print("{s}Parsed Arguments:{s}\n\n", .{Colors.Bold, Colors.Reset}) catch {};
+    stdout.print("\tTarget License:\t\t{s}\"{s}\"{s}\n", .{Colors.Blue, parsed_args.target_license, Colors.Reset}) catch {};
+    stdout.print("\tFix Mode:\t\t{s}{}{s}\n", .{Colors.Blue, parsed_args.fix, Colors.Reset}) catch {};
+    stdout.print("\tContinue on Error:\t{s}{}{s}\n\n", .{Colors.Blue, parsed_args.continue_on_error, Colors.Reset}) catch {};
 
     const start_nanos = std.time.nanoTimestamp();
+
+    // Validate target license
     const cwd = std.fs.cwd();
 
     var checked_files: usize = 0;
-    var files_with_license: usize = 0;
-    var line_buffer: [8192]u8 = undefined;
+    var matched_files: usize = 0;
+    var line_buffer: [256]u8 = undefined;
 
-    for (file_paths_string.items) |file_path| {
-        const trimmed_path = std.mem.trim(u8, file_path, " \t\r\n");
+    stdout.print("{s}Warnings / Errors:{s}\n\n", .{Colors.Bold, Colors.Reset}) catch {};
+    for (parsed_args.file_paths) |file_path| {
+        // Increment checked files count, so it can be printed in summary later
+        checked_files += 1;
 
-        if (trimmed_path.len == 0) continue;
+        const trimmed_path = std.mem.trim(u8, file_path, " \t\n\r");
 
-        const file = cwd.openFile(trimmed_path, .{}) catch {
-            print("Could not open file: {s}\n", .{trimmed_path});
+        if (trimmed_path.len == 0) {
+            stdout.print("{s}Warning:{s} Skipping empty file path.\n", .{ Colors.Yellow, Colors.Reset }) catch {};
             continue;
+        }
+
+        const file = cwd.openFile(trimmed_path, .{ .mode = .read_write }) catch |err| {
+            std.debug.print("{s}Error:{s} Could not open file: {s} {}\n", .{ Colors.Red, Colors.Reset, trimmed_path, err });
+            if (!parsed_args.continue_on_error) {
+                py.PyErr_SetString(PyExc_ValueError, "Could not open file");
+                return null;
+            } else {
+                continue;
+            }
         };
         defer file.close();
 
-        // Read first line directly into buffer (no allocation)
+        // Read first line
         const bytes_read = file.read(line_buffer[0..]) catch {
-            print("Error reading file: {s}\n", .{trimmed_path});
+            std.debug.print("Error reading file: {s}\n", .{trimmed_path});
             continue;
         };
 
@@ -142,29 +102,59 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
         const newline_pos = std.mem.indexOf(u8, line_buffer[0..bytes_read], "\n") orelse bytes_read;
         const first_line = line_buffer[0..newline_pos];
 
-        // Simple substring search (like Python's "in")
-        if (std.mem.indexOf(u8, first_line, target_license_slice) != null) {
-            files_with_license += 1;
+        if (std.mem.indexOf(u8, first_line, parsed_args.target_license) != null) {
+            matched_files += 1;
         } else {
-            print("File '{s}' does not match target license '{s}'.\n", .{ trimmed_path, target_license_slice });
-            py.PyErr_SetString(PyExc_ValueError, "File does not match target license.");
-            const end_nanos = std.time.nanoTimestamp();
-            const elapsed_ms = @divTrunc(end_nanos - start_nanos, std.time.ns_per_ms);
-            checked_files += 1;
-            print("Files with license '{s}': {d} / {d} Files\n", .{ target_license_slice, files_with_license, checked_files });
-            print("License check completed in ({d}ns) {d}ms \n", .{ end_nanos - start_nanos, elapsed_ms });
-            return null;
+            if (parsed_args.fix) {
+                
+                // Here you would implement the fixing logic
+                // For now, just print a message
+                const file_extension = utils.getFileExtension(trimmed_path);
+
+                utils.addLicenseHeader(allocator, parsed_args, file, file_extension) catch |err| {
+                    stdout.print("{s}E:{s} {s}\t{}\n", .{ Colors.Red, Colors.Reset, trimmed_path, err }) catch {};
+                    if (!parsed_args.continue_on_error) {
+                        py.PyErr_SetString(PyExc_ValueError, "Could not add license header to file");
+                        return null;
+                    } else {
+                        continue;
+                    }
+                };
+                stdout.print("{s}F:{s} File '{s}' does not match target license '{s}'.\n", .{ Colors.Green, Colors.Reset, trimmed_path, parsed_args.target_license }) catch {};
+                matched_files += 1;
+                continue;
+            } else if (parsed_args.continue_on_error) {
+                stdout.print("{s}W:{s} File '{s}' does not match target license '{s}'. Continuing due to continue_on_error flag.\n", .{ Colors.Yellow, Colors.Reset, trimmed_path, parsed_args.target_license }) catch {};
+                continue;
+            } else {
+                stdout.print("File '{s}' does not match target license '{s}'.\n", .{ trimmed_path, parsed_args.target_license }) catch {};
+                py.PyErr_SetString(PyExc_ValueError, "File does not match target license.");
+                const end_nanos = std.time.nanoTimestamp();
+                const elapsed_ms = @divTrunc(end_nanos - start_nanos, std.time.ns_per_ms);
+                stdout.print("Files with license '{s}': {d} / {d} Files\n", .{ parsed_args.target_license, matched_files, checked_files }) catch {};
+                stdout.print("License check completed in ({d}ns) {d}ms \n", .{ end_nanos - start_nanos, elapsed_ms }) catch {};
+                return null;
+            }
         }
-        checked_files += 1;
     }
 
     const end_nanos = std.time.nanoTimestamp();
     const elapsed_ms = @divTrunc(end_nanos - start_nanos, std.time.ns_per_ms);
 
-    print("Files with license '{s}': {d} / {d} Files\n", .{ target_license_slice, files_with_license, checked_files });
-    print("License check completed in ({d}ns) {d}ms \n", .{ end_nanos - start_nanos, elapsed_ms });
+    stdout.print("\n{s}Summary:{s}\n\n", .{ Colors.Bold, Colors.Reset }) catch {};
+    stdout.print("Files with license {s}\"{s}\"{s}:\t{d}/{d} Files\n", .{ Colors.Blue,  parsed_args.target_license, Colors.Reset, matched_files, checked_files }) catch {};
+    stdout.print("License check completed in {s}({d}ns) {d}ms {s}\n\n", .{ Colors.Bold,end_nanos - start_nanos, elapsed_ms, Colors.Reset}) catch {};
+    
+    if (matched_files != checked_files) {
+        // Error case: not all files matched
+        py.PyErr_SetString(PyExc_ValueError, "Some files did not match the target license.");
+        return null;
+    }
 
-    return py.PyLong_FromLong(@intCast(files_with_license));
+    // Return None on success
+    const none = py.Py_GetConstantBorrowed(py.Py_CONSTANT_NONE);
+    py.Py_IncRef(none);
+    return py.PyLong_FromLong(0);
 }
 
 var Methods = [_]PyMethodDef{
@@ -182,11 +172,17 @@ var Methods = [_]PyMethodDef{
         \\    The SPDX license identifier to check against.
         \\file_paths: list
         \\    file_paths: A list of file paths to check.
+        \\fix: bool, optional
+        \\    If True, the tool will attempt to add the correct SPDX license header
+        \\    to files that do not match the target license. Default is False.
+        \\continue_on_error: bool, optional
+        \\    If True, the tool will continue checking other files even if one file
+        \\    does not match the target license. Default is True.
         \\
         \\Returns
         \\-------
         \\bool
-        \\    Returns a Python integer object (1) on success.
+        \\    Returns a Python integer object (0) on success.
         \\    Raises ValueError and returns null on error.
         \\
         \\Raises
