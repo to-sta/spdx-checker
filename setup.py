@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 from setuptools import setup, Extension, find_packages
 from pathlib import Path
 

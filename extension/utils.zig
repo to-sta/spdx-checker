@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 const std = @import("std");
 const Arguments = @import("parse.zig").Arguments;
 

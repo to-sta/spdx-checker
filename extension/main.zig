@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 const std = @import("std");
 const py = @import("python.zig").py;
 const ParseError = @import("errors.zig").ParseError;
