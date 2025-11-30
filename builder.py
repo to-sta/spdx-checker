@@ -24,6 +24,7 @@ class ZigBuilder(build_ext):
         is_macos = system == "Darwin"
 
         out_path = self.get_ext_fullpath(ext.name)
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
         cmd = [
             "zig",
             "build-lib",

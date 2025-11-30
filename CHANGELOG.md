@@ -1,8 +1,18 @@
 # Changelog
 
-All notable changes to this project are recorded here. Changelog has been added with version 0.1.4. The format is similar to the [Keep a Changelog]((https://keepachangelog.com/en/1.0.0/)) convention.
+All notable changes to this project are recorded here. Changelog has been added with version 0.1.4. The format is similar to the [Keep a Changelog](<(https://keepachangelog.com/en/1.0.0/)>) convention.
 
-## [0.1.17]
+## [0.1.18] - 2025-11-30
+
+## Changed
+
+- switched from args only to args and `kwargs`
+
+## Added
+
+- Filter option `extensions` added, for filtering `file_paths` by file extensions (e.g .zig)
+
+## [0.1.17] - 2025-11-28
 
 ## Removed
 

@@ -21,8 +21,9 @@ import spdx_checker
 spdx_checker.check_license(
     "MIT", 
     ["example1.py", "example2.svelte", "example3.html"]
-    True,
-    False
+    extensions=["zig", "py", "svelte"]
+    fix=True,
+    continue_on_error=False
     )
 ```
 

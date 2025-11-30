@@ -6,6 +6,11 @@ const Colors = @import("utils.zig").Colors;
 const utils = @import("utils.zig");
 const parse = @import("parse.zig");
 
+// Version information
+const MAJOR = @import("version.zig").MAJOR;
+const MINOR = @import("version.zig").MINOR;
+const PATCH = @import("version.zig").PATCH;
+
 // Aliases for Python C API types and functions
 const PyObject = py.PyObject;
 const PyMethodDef = py.PyMethodDef;
@@ -18,16 +23,20 @@ const PyArg_ParseTuple = py.PyArg_ParseTuple;
 const PyLong_FromLong = py.PyLong_FromLong;
 extern var PyExc_ValueError: [*c]py.PyObject;
 
-fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c]PyObject {
+fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyObject) callconv(.c) [*c]PyObject {
     _ = self;
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{ .safety = false, .thread_safe = true }){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{ .safety = true, .thread_safe = true }){};
     defer _ = gpa.deinit();
 
     const allocator = gpa.allocator();
 
-    var parsed_args = parse.Arguments.parse(args, allocator) catch |err| {
-        // Return null on error, because Python exception is already set.
+    var parsed_args = parse.Arguments.parse(args, kwargs, allocator) catch |err| {
+        // Check if a Python error is already set for missing arguments
+        if (py.PyErr_Occurred() != null) {
+            return null; // Just return null, Python error is already set
+        }
+
         switch (err) {
             ParseError.ParseFailed => {
                 py.PyErr_SetString(PyExc_ValueError, "Failed to parse arguments");
@@ -52,25 +61,41 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
     // Allocate a buffer for stdout
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    
     const stdout = &stdout_writer.interface;
     defer stdout.flush() catch {};
 
-    stdout.print("{s}spdx_checker {s}v0.1.15{s}\n\n", .{Colors.Bold, Colors.Purple, Colors.Reset}) catch {};
-    stdout.print("{s}Parsed Arguments:{s}\n\n", .{Colors.Bold, Colors.Reset}) catch {};
-    stdout.print("\tTarget License:\t\t{s}\"{s}\"{s}\n", .{Colors.Blue, parsed_args.target_license, Colors.Reset}) catch {};
-    stdout.print("\tFix Mode:\t\t{s}{}{s}\n", .{Colors.Blue, parsed_args.fix, Colors.Reset}) catch {};
-    stdout.print("\tContinue on Error:\t{s}{}{s}\n\n", .{Colors.Blue, parsed_args.continue_on_error, Colors.Reset}) catch {};
+    stdout.print("{s}spdx_checker {s}v{d}.{d}.{d}{s}\n\n", .{ Colors.Bold, Colors.Purple, MAJOR, MINOR, PATCH, Colors.Reset }) catch {};
+    stdout.print("{s}Parsed Arguments:{s}\n\n", .{ Colors.Bold, Colors.Reset }) catch {};
+    stdout.print("\tTarget License:\t\t{s}\"{s}\"{s}\n", .{ Colors.Blue, parsed_args.target_license, Colors.Reset }) catch {};
+    stdout.print("\tFix Mode:\t\t{s}{}{s}\n", .{ Colors.Blue, parsed_args.fix, Colors.Reset }) catch {};
+    stdout.print("\tContinue on Error:\t{s}{}{s}\n", .{ Colors.Blue, parsed_args.continue_on_error, Colors.Reset }) catch {};
+    stdout.print("\tExtensions:\t\t", .{}) catch {};
+    for (parsed_args.extensions) |ext| {
+        stdout.print("{s}.{s}{s} ", .{ Colors.Green, ext, Colors.Reset }) catch {};
+    }
 
     const start_nanos = std.time.nanoTimestamp();
 
-    // Validate target license
     const cwd = std.fs.cwd();
-
     var checked_files: usize = 0;
     var matched_files: usize = 0;
     var line_buffer: [256]u8 = undefined;
 
-    stdout.print("{s}Warnings / Errors:{s}\n\n", .{Colors.Bold, Colors.Reset}) catch {};
+    // Filter file paths by extensions
+    const original_file_count = parsed_args.file_paths.len;
+    const is_filtered = utils.filterByExtensions(allocator, parsed_args.extensions, &parsed_args.file_paths) catch {
+        py.PyErr_SetString(PyExc_ValueError, "Failed to filter file paths by extensions.");
+        return null;
+    };
+
+    // Check if file paths list length is zero after filtering
+    if (parsed_args.file_paths.len == 0) {
+        stdout.print("\n\n{s}No files to process after filtering by provided extensions.{s}\n\n", .{ Colors.Yellow, Colors.Reset }) catch {};
+        return py.PyLong_FromLong(0);
+    }
+
+    stdout.print("\n\n{s}Warnings / Errors:{s}\n\n", .{ Colors.Bold, Colors.Reset }) catch {};
     for (parsed_args.file_paths) |file_path| {
         // Increment checked files count, so it can be printed in summary later
         checked_files += 1;
@@ -83,7 +108,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
         }
 
         const file = cwd.openFile(trimmed_path, .{ .mode = .read_write }) catch |err| {
-            std.debug.print("{s}Error:{s} Could not open file: {s} {}\n", .{ Colors.Red, Colors.Reset, trimmed_path, err });
+            stdout.print("{s}E:{s} Could not open file: {s} {}\n", .{ Colors.Red, Colors.Reset, trimmed_path, err }) catch {};
             if (!parsed_args.continue_on_error) {
                 py.PyErr_SetString(PyExc_ValueError, "Could not open file");
                 return null;
@@ -95,7 +120,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
 
         // Read first line
         const bytes_read = file.read(line_buffer[0..]) catch {
-            std.debug.print("Error reading file: {s}\n", .{trimmed_path});
+            stdout.print("{s}E:{s} reading file: {s}\n", .{ Colors.Red, Colors.Reset, trimmed_path }) catch {};
             continue;
         };
 
@@ -107,7 +132,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
             matched_files += 1;
         } else {
             if (parsed_args.fix) {
-                
+
                 // Here you would implement the fixing logic
                 // For now, just print a message
                 const file_extension = utils.getFileExtension(trimmed_path);
@@ -121,11 +146,11 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
                         continue;
                     }
                 };
-                stdout.print("{s}F:{s} File '{s}' does not match target license '{s}'.\n", .{ Colors.Green, Colors.Reset, trimmed_path, parsed_args.target_license }) catch {};
+                stdout.print("{s}F:{s}{s} target license mismatch '{s}'.\n", .{ Colors.Green, Colors.Reset, trimmed_path, parsed_args.target_license }) catch {};
                 matched_files += 1;
                 continue;
             } else if (parsed_args.continue_on_error) {
-                stdout.print("{s}W:{s} File '{s}' does not match target license '{s}'. Continuing due to continue_on_error flag.\n", .{ Colors.Yellow, Colors.Reset, trimmed_path, parsed_args.target_license }) catch {};
+                stdout.print("{s}W:{s}{s} target license mismatch '{s}'.\n", .{ Colors.Yellow, Colors.Reset, trimmed_path, parsed_args.target_license }) catch {};
                 continue;
             } else {
                 stdout.print("File '{s}' does not match target license '{s}'.\n", .{ trimmed_path, parsed_args.target_license }) catch {};
@@ -143,9 +168,13 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
     const elapsed_ms = @divTrunc(end_nanos - start_nanos, std.time.ns_per_ms);
 
     stdout.print("\n{s}Summary:{s}\n\n", .{ Colors.Bold, Colors.Reset }) catch {};
-    stdout.print("Files with license {s}\"{s}\"{s}:\t{d}/{d} Files\n", .{ Colors.Blue,  parsed_args.target_license, Colors.Reset, matched_files, checked_files }) catch {};
-    stdout.print("License check completed in {s}({d}ns) {d}ms {s}\n\n", .{ Colors.Bold,end_nanos - start_nanos, elapsed_ms, Colors.Reset}) catch {};
-    
+    stdout.print("Files with license:\t\t{d}/{d} Files\n", .{ matched_files, checked_files }) catch {};
+    stdout.print("License check completed in {s}({d}ns) {d}ms {s}\n\n", .{ Colors.Bold, end_nanos - start_nanos, elapsed_ms, Colors.Reset }) catch {};
+
+    if (is_filtered) {
+        stdout.print("{s}Note:{s} File paths were filtered down from {d} to {d} by extensions provided.\n\n", .{ Colors.Yellow, Colors.Reset, original_file_count, parsed_args.file_paths.len }) catch {};
+    }
+
     if (matched_files != checked_files) {
         // Error case: not all files matched
         py.PyErr_SetString(PyExc_ValueError, "Some files did not match the target license.");
@@ -158,10 +187,10 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject) callconv(.c) [*c
 var Methods = [_]PyMethodDef{
     PyMethodDef{
         .ml_name = "check_license",
-        .ml_meth = spdx_license_checker,
-        .ml_flags = py.METH_VARARGS,
+        .ml_meth = @ptrCast(&spdx_license_checker),
+        .ml_flags = py.METH_VARARGS | py.METH_KEYWORDS,
         .ml_doc =
-        \\Checks agains a list of allowed SPDX Licenses and then checks each file's 
+        \\Check if files contain the specified SPDX license identifier in the
         \\first line against the target license.
         \\
         \\Parameters
@@ -170,10 +199,10 @@ var Methods = [_]PyMethodDef{
         \\    The SPDX license identifier to check against.
         \\file_paths: list
         \\    file_paths: A list of file paths to check.
-        \\fix: bool, optional
+        \\fix: bool, optional (default=False)
         \\    If True, the tool will attempt to add the correct SPDX license header
         \\    to files that do not match the target license. Default is False.
-        \\continue_on_error: bool, optional
+        \\continue_on_error: bool, optional (default=False)
         \\    If True, the tool will continue checking other files even if one file
         \\    does not match the target license. Default is True.
         \\

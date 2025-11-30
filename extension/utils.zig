@@ -82,77 +82,54 @@ pub fn getFileExtension(file_path: []const u8) []const u8 {
     }
 }
 
-pub fn getFilePrefix(file_extension: []const u8) ![]const u8 {
-    const prefix_map = std.StaticStringMap([]const u8).initComptime(.{
-        // C-style comments
-        .{ "c", "// " },
-        .{ "h", "// " },
-        .{ "cpp", "// " },
-        .{ "hpp", "// " },
-        .{ "cc", "// " },
-        .{ "cxx", "// " },
-        .{ "js", "// " },
-        .{ "ts", "// " },
-        .{ "tsx", "// " },
-        .{ "jsx", "// " },
-        .{ "java", "// " },
-        .{ "go", "// " },
-        .{ "rs", "// " },
-        .{ "svelte", "// " },
-        .{ "vue", "// " },
-        .{ "zig", "// " },
+pub const CommentStyles = struct {
+    const Style = struct {
+        prefix: []const u8,
+        postfix: []const u8,
+    };
 
-        // Hash comments
-        .{ "py", "# " },
-        .{ "sh", "# " },
-        .{ "bash", "# " },
-
-        // Block comments
-        .{ "css", "/* " },
-        .{ "c-block", "/* " },
-
-        // XML/HTML comments
-        .{ "html", "<!-- " },
-        .{ "xml", "<!-- " },
+    pub const styles = std.StaticStringMap(Style).initComptime(.{
+        // Supported file extensions and their comment styles
+        // file extensions, prefix and postfix
+        // if no postfix, use empty string.
+        .{ "c", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "h", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "cpp", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "hpp", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "cc", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "cxx", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "js", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "ts", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "tsx", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "jsx", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "java", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "go", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "rs", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "svelte", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "vue", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "zig", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "py", Style{ .prefix = "# ", .postfix = "" } },
+        .{ "sh", Style{ .prefix = "# ", .postfix = "" } },
+        .{ "bash", Style{ .prefix = "# ", .postfix = "" } },
+        .{ "css", Style{ .prefix = "/* ", .postfix = " */" } },
+        .{ "html", Style{ .prefix = "<!-- ", .postfix = " -->" } },
+        .{ "xml", Style{ .prefix = "<!-- ", .postfix = " -->" } },
     });
-    return prefix_map.get(file_extension) orelse error.UnrecognizedFileExtension;
-}
 
-pub fn getFilePostfix(file_extension: []const u8) ![]const u8 {
-    const postfix_map = std.StaticStringMap([]const u8).initComptime(.{
-        // C-style comments
-        .{ "c", "" },
-        .{ "h", "" },
-        .{ "cpp", "" },
-        .{ "hpp", "" },
-        .{ "cc", "" },
-        .{ "cxx", "" },
-        .{ "js", "" },
-        .{ "ts", "" },
-        .{ "tsx", "" },
-        .{ "jsx", "" },
-        .{ "java", "" },
-        .{ "go", "" },
-        .{ "rs", "" },
-        .{ "svelte", "" },
-        .{ "vue", "" },
-        .{ "zig", "" },
+    pub fn getPrefix(lang: []const u8) ![]const u8 {
+        if (styles.get(lang)) |style| {
+            return style.prefix;
+        }
+        return error.UnrecognizedFileExtension;
+    }
 
-        // Hash comments
-        .{ "py", "" },
-        .{ "sh", "" },
-        .{ "bash", "" },
-
-        // Block comments
-        .{ "css", " */" },
-        .{ "c-block", " */" },
-
-        // XML/HTML comments
-        .{ "html", " -->" },
-        .{ "xml", " -->" },
-    });
-    return postfix_map.get(file_extension) orelse error.UnrecognizedFileExtension;
-}
+    pub fn getPostfix(lang: []const u8) ![]const u8 {
+        if (styles.get(lang)) |style| {
+            return style.postfix;
+        }
+        return error.UnrecognizedFileExtension;
+    }
+};
 
 /// Adds an SPDX license header to the beginning of a file.
 ///
@@ -176,8 +153,8 @@ pub fn addLicenseHeader(allocator: std.mem.Allocator, args: Arguments, file: std
     const bytes_read = try file.readAll(file_buf);
 
     var header_buf: [128]u8 = undefined;
-    const prefix = try getFilePrefix(file_extension);
-    const postfix = try getFilePostfix(file_extension);
+    const prefix = try CommentStyles.getPrefix(file_extension);
+    const postfix = try CommentStyles.getPostfix(file_extension);
 
     const header_slice = try std.fmt.bufPrint(&header_buf, "{s}SPDX-License-Identifier: {s}{s}\n", .{ prefix, args.target_license, postfix });
     const header_len = header_slice.len;
@@ -187,4 +164,33 @@ pub fn addLicenseHeader(allocator: std.mem.Allocator, args: Arguments, file: std
     try file.writeAll(file_buf[0..bytes_read]);
 
     try file.setEndPos(header_len + bytes_read);
+}
+
+pub fn filterByExtensions(allocator: std.mem.Allocator, extensions: [][]const u8, file_paths: *[][]const u8) !bool {
+    if (extensions.len == 0) {
+        return false;
+    }
+
+    var filtered = try std.ArrayList([]const u8).initCapacity(allocator, file_paths.len);
+    defer filtered.deinit(allocator);
+
+    for (file_paths.*) |path| {
+        const file_ext = getFileExtension(path);
+
+        for (extensions) |ext| {
+            if (std.mem.eql(u8, file_ext, ext)) {
+                try filtered.append(allocator, path);
+                break;
+            }
+        }
+    }
+
+    if (file_paths.len > filtered.items.len) {
+        // Free previous allocation to avoid memory leak
+        allocator.free(file_paths.*);
+        // Overwrite file_paths with filtered results
+        file_paths.* = try allocator.dupe([]const u8, filtered.items);
+        return true;
+    }
+    return false;
 }

@@ -1,10 +1,10 @@
 [project]
 name = "spdx_checker"
-version = "0.1.17"
+version = "0.1.18"
 
 description = "Fast SPDX License Checker for Source Code"
 readme = "README.md"
-license = { file = "LICENSE" }
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 authors = [{ name = "Tobias Stach"}]
 
