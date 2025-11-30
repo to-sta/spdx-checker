@@ -2,6 +2,13 @@
 
 All notable changes to this project are recorded here. Changelog has been added with version 0.1.4. The format is similar to the [Keep a Changelog](<(https://keepachangelog.com/en/1.0.0/)>) convention.
 
+## [0.1.19] - 2025-11-30
+
+## Changed
+
+- Checks whether terminal color support is available
+
+
 ## [0.1.18] - 2025-11-30
 
 ## Changed

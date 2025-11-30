@@ -61,18 +61,20 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
     // Allocate a buffer for stdout
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
-    
+
     const stdout = &stdout_writer.interface;
     defer stdout.flush() catch {};
 
-    stdout.print("{s}spdx_checker {s}v{d}.{d}.{d}{s}\n\n", .{ Colors.Bold, Colors.Purple, MAJOR, MINOR, PATCH, Colors.Reset }) catch {};
-    stdout.print("{s}Parsed Arguments:{s}\n\n", .{ Colors.Bold, Colors.Reset }) catch {};
-    stdout.print("\tTarget License:\t\t{s}\"{s}\"{s}\n", .{ Colors.Blue, parsed_args.target_license, Colors.Reset }) catch {};
-    stdout.print("\tFix Mode:\t\t{s}{}{s}\n", .{ Colors.Blue, parsed_args.fix, Colors.Reset }) catch {};
-    stdout.print("\tContinue on Error:\t{s}{}{s}\n", .{ Colors.Blue, parsed_args.continue_on_error, Colors.Reset }) catch {};
+    const colors = Colors.select();
+
+    stdout.print("{s}spdx_checker {s}v{d}.{d}.{d}{s}\n\n", .{ colors.bold, colors.purple, MAJOR, MINOR, PATCH, colors.reset }) catch {};
+    stdout.print("{s}Parsed Arguments:{s}\n\n", .{ colors.bold, colors.reset }) catch {};
+    stdout.print("\tTarget License:\t\t{s}\"{s}\"{s}\n", .{ colors.blue, parsed_args.target_license, colors.reset }) catch {};
+    stdout.print("\tFix Mode:\t\t{s}{}{s}\n", .{ colors.blue, parsed_args.fix, colors.reset }) catch {};
+    stdout.print("\tContinue on Error:\t{s}{}{s}\n", .{ colors.blue, parsed_args.continue_on_error, colors.reset }) catch {};
     stdout.print("\tExtensions:\t\t", .{}) catch {};
     for (parsed_args.extensions) |ext| {
-        stdout.print("{s}.{s}{s} ", .{ Colors.Green, ext, Colors.Reset }) catch {};
+        stdout.print("{s}.{s}{s} ", .{ colors.green, ext, colors.reset }) catch {};
     }
 
     const start_nanos = std.time.nanoTimestamp();
@@ -91,11 +93,11 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
 
     // Check if file paths list length is zero after filtering
     if (parsed_args.file_paths.len == 0) {
-        stdout.print("\n\n{s}No files to process after filtering by provided extensions.{s}\n\n", .{ Colors.Yellow, Colors.Reset }) catch {};
+        stdout.print("\n\n{s}No files to process after filtering by provided extensions.{s}\n\n", .{ colors.yellow, colors.reset }) catch {};
         return py.PyLong_FromLong(0);
     }
 
-    stdout.print("\n\n{s}Warnings / Errors:{s}\n\n", .{ Colors.Bold, Colors.Reset }) catch {};
+    stdout.print("\n\n{s}Warnings / Errors:{s}\n\n", .{ colors.bold, colors.reset }) catch {};
     for (parsed_args.file_paths) |file_path| {
         // Increment checked files count, so it can be printed in summary later
         checked_files += 1;
@@ -103,12 +105,12 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
         const trimmed_path = std.mem.trim(u8, file_path, " \t\n\r");
 
         if (trimmed_path.len == 0) {
-            stdout.print("{s}Warning:{s} Skipping empty file path.\n", .{ Colors.Yellow, Colors.Reset }) catch {};
+            stdout.print("{s}Warning:{s} Skipping empty file path.\n", .{ colors.yellow, colors.reset }) catch {};
             continue;
         }
 
         const file = cwd.openFile(trimmed_path, .{ .mode = .read_write }) catch |err| {
-            stdout.print("{s}E:{s} Could not open file: {s} {}\n", .{ Colors.Red, Colors.Reset, trimmed_path, err }) catch {};
+            stdout.print("{s}E:{s} Could not open file: {s} {}\n", .{ colors.red, colors.reset, trimmed_path, err }) catch {};
             if (!parsed_args.continue_on_error) {
                 py.PyErr_SetString(PyExc_ValueError, "Could not open file");
                 return null;
@@ -120,7 +122,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
 
         // Read first line
         const bytes_read = file.read(line_buffer[0..]) catch {
-            stdout.print("{s}E:{s} reading file: {s}\n", .{ Colors.Red, Colors.Reset, trimmed_path }) catch {};
+            stdout.print("{s}E:{s} reading file: {s}\n", .{ colors.red, colors.reset, trimmed_path }) catch {};
             continue;
         };
 
@@ -138,7 +140,7 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
                 const file_extension = utils.getFileExtension(trimmed_path);
 
                 utils.addLicenseHeader(allocator, parsed_args, file, file_extension) catch |err| {
-                    stdout.print("{s}E:{s} {s}\t{}\n", .{ Colors.Red, Colors.Reset, trimmed_path, err }) catch {};
+                    stdout.print("{s}E:{s} {s}\t{}\n", .{ colors.red, colors.reset, trimmed_path, err }) catch {};
                     if (!parsed_args.continue_on_error) {
                         py.PyErr_SetString(PyExc_ValueError, "Could not add license header to file");
                         return null;
@@ -146,11 +148,11 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
                         continue;
                     }
                 };
-                stdout.print("{s}F:{s}{s} target license mismatch '{s}'.\n", .{ Colors.Green, Colors.Reset, trimmed_path, parsed_args.target_license }) catch {};
+                stdout.print("{s}F:{s}{s} target license mismatch '{s}'.\n", .{ colors.green, colors.reset, trimmed_path, parsed_args.target_license }) catch {};
                 matched_files += 1;
                 continue;
             } else if (parsed_args.continue_on_error) {
-                stdout.print("{s}W:{s}{s} target license mismatch '{s}'.\n", .{ Colors.Yellow, Colors.Reset, trimmed_path, parsed_args.target_license }) catch {};
+                stdout.print("{s}W:{s}{s} target license mismatch '{s}'.\n", .{ colors.yellow, colors.reset, trimmed_path, parsed_args.target_license }) catch {};
                 continue;
             } else {
                 stdout.print("File '{s}' does not match target license '{s}'.\n", .{ trimmed_path, parsed_args.target_license }) catch {};
@@ -167,12 +169,12 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
     const end_nanos = std.time.nanoTimestamp();
     const elapsed_ms = @divTrunc(end_nanos - start_nanos, std.time.ns_per_ms);
 
-    stdout.print("\n{s}Summary:{s}\n\n", .{ Colors.Bold, Colors.Reset }) catch {};
+    stdout.print("\n{s}Summary:{s}\n\n", .{ colors.bold, colors.reset }) catch {};
     stdout.print("Files with license:\t\t{d}/{d} Files\n", .{ matched_files, checked_files }) catch {};
-    stdout.print("License check completed in {s}({d}ns) {d}ms {s}\n\n", .{ Colors.Bold, end_nanos - start_nanos, elapsed_ms, Colors.Reset }) catch {};
+    stdout.print("License check completed in {s}({d}ns) {d}ms {s}\n\n", .{ colors.bold, end_nanos - start_nanos, elapsed_ms, colors.reset }) catch {};
 
     if (is_filtered) {
-        stdout.print("{s}Note:{s} File paths were filtered down from {d} to {d} by extensions provided.\n\n", .{ Colors.Yellow, Colors.Reset, original_file_count, parsed_args.file_paths.len }) catch {};
+        stdout.print("{s}Note:{s} File paths were filtered down from {d} to {d} by extensions provided.\n\n", .{ colors.yellow, colors.reset, original_file_count, parsed_args.file_paths.len }) catch {};
     }
 
     if (matched_files != checked_files) {

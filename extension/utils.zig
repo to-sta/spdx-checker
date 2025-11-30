@@ -2,15 +2,46 @@
 const std = @import("std");
 const Arguments = @import("parse.zig").Arguments;
 
+pub const ColorSet = struct {
+    reset: []const u8,
+    bold: []const u8,
+    underline: []const u8,
+    red: []const u8,
+    green: []const u8,
+    yellow: []const u8,
+    blue: []const u8,
+    purple: []const u8,
+};
+
 pub const Colors = struct {
-    pub const Reset = "\x1b[0m";
-    pub const Bold = "\x1b[1m";
-    pub const Underline = "\x1b[4m";
-    pub const Red = "\x1b[31m";
-    pub const Green = "\x1b[32m";
-    pub const Yellow = "\x1b[33m";
-    pub const Blue = "\x1b[34m";
-    pub const Purple = "\x1b[35m";
+    pub const ansi = ColorSet{
+        .reset = "\x1b[0m",
+        .bold = "\x1b[1m",
+        .underline = "\x1b[4m",
+        .red = "\x1b[31m",
+        .green = "\x1b[32m",
+        .yellow = "\x1b[33m",
+        .blue = "\x1b[34m",
+        .purple = "\x1b[35m",
+    };
+    pub const none = ColorSet{
+        .reset = "",
+        .bold = "",
+        .underline = "",
+        .red = "",
+        .green = "",
+        .yellow = "",
+        .blue = "",
+        .purple = "",
+    };
+
+    pub fn select() ColorSet {
+        if (std.fs.File.stdout().isTty()) {
+            return ansi;
+        } else {
+            return none;
+        }
+    }
 };
 
 pub fn cleanFirstLine(allocator: std.mem.Allocator, args: struct { first_line: []const u8 }) ![]const u8 {
