@@ -2,6 +2,13 @@
 
 All notable changes to this project are recorded here. Changelog has been added with version 0.1.4. The format is similar to the [Keep a Changelog](<(https://keepachangelog.com/en/1.0.0/)>) convention.
 
+## [0.1.20] - 2025-12-06
+
+## Added
+
+- added optional exclude option with glob pattern
+- kotlin and swift files to be fixable
+
 ## [0.1.19] - 2025-11-30
 
 ## Changed

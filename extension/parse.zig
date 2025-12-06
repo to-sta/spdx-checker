@@ -9,12 +9,14 @@ pub const Arguments = struct {
     fix: bool,
     continue_on_error: bool,
     extensions: [][]const u8,
+    exclude: [][]const u8,
 
     allocator: std.mem.Allocator,
 
     pub fn deinit(self: *Arguments) void {
         self.allocator.free(self.file_paths);
         self.allocator.free(self.extensions);
+        self.allocator.free(self.exclude);
     }
 
     pub fn parse(args: [*c]py.PyObject, kwargs: [*c]py.PyObject, allocator: std.mem.Allocator) ParseError!Arguments {
@@ -22,12 +24,14 @@ pub const Arguments = struct {
         var target_license_ptr: [*:0]const u8 = undefined;
         var file_paths_obj: [*c]py.PyObject = undefined;
         var extensions_obj: [*c]py.PyObject = null;
+        var exclude_obj: [*c]py.PyObject = null;
         var fix_int: c_int = 0;
         var continue_on_error_int: c_int = 0;
 
         const kw_target: [*c]u8 = @constCast("target_license");
         const kw_files: [*c]u8 = @constCast("file_paths");
         const kw_ext: [*c]u8 = @constCast("extensions");
+        const kw_exclude: [*c]u8 = @constCast("exclude");
         const kw_fix: [*c]u8 = @constCast("fix");
         const kw_cont: [*c]u8 = @constCast("continue_on_error");
 
@@ -35,25 +39,37 @@ pub const Arguments = struct {
             kw_target,
             kw_files,
             kw_ext,
+            kw_exclude,
             kw_fix,
             kw_cont,
             null,
         };
 
         // Args and Kwargs parsing
-        // python docs: https://docs.python.org/3/c-api/arg.html#c.PyArg_ParseTupleAndKeywords
+        // Python docs: https://docs.python.org/3/c-api/arg.html#c.PyArg_ParseTupleAndKeywords
+        //
+        // Format: "sO!|OOpp"
+        //
+        //  s: string (target_license)
+        //  O!: object with type check (file_paths, must be a list)
+        //  |: indicates the following arguments are optional
+        //  O: object (extensions, optional)
+        //  O: object (exclude, optional)
+        //  p: boolean as int (fix, optional)
+        //  p: boolean as int (continue_on_error, optional)
         const results = py.PyArg_ParseTupleAndKeywords(
             args,
             kwargs,
-            "sO!|Opp",
+            "sO!|OOpp",
             @constCast(&kwlist),
             &target_license_ptr,
             &py.PyList_Type,
             &file_paths_obj,
             &extensions_obj,
+            &exclude_obj,
             &fix_int,
             &continue_on_error_int,
-        ); 
+        );
 
         if (results == 0) {
             return error.ParseFailed;
@@ -62,6 +78,10 @@ pub const Arguments = struct {
         // If extensions are not provided, set to an empty list
         if (extensions_obj == null) {
             extensions_obj = py.PyList_New(0);
+        }
+
+        if (exclude_obj == null) {
+            exclude_obj = py.PyList_New(0);
         }
 
         const target_license: []const u8 = std.mem.span(target_license_ptr);
@@ -78,6 +98,11 @@ pub const Arguments = struct {
             return error.InvalidList;
         }
 
+        const exclude_pattern_len = py.PyList_Size(exclude_obj);
+        if (exclude_pattern_len < 0) {
+            return error.InvalidList;
+        }
+
         const file_paths = allocator.alloc([]const u8, @intCast(file_paths_len)) catch |err| {
             return err;
         };
@@ -87,6 +112,11 @@ pub const Arguments = struct {
             return err;
         };
         errdefer allocator.free(extensions);
+
+        const exclude = allocator.alloc([]const u8, @intCast(exclude_pattern_len)) catch |err| {
+            return err;
+        };
+        errdefer allocator.free(exclude);
 
         var i: isize = 0;
         while (i < file_paths_len) : (i += 1) {
@@ -134,6 +164,31 @@ pub const Arguments = struct {
             }
         }
 
+        if (exclude_pattern_len > 0) {
+            var k: isize = 0;
+
+            while (k < exclude_pattern_len) : (k += 1) {
+                const item = py.PyList_GetItem(exclude_obj, k);
+                if (item == null) {
+                    allocator.free(exclude);
+                    py.PyErr_SetString(py.PyExc_TypeError, "Invalid list item");
+                    return error.InvalidListItem;
+                }
+
+                const pattern_bytes = py.PyUnicode_AsUTF8String(item);
+                if (pattern_bytes == null) {
+                    allocator.free(exclude);
+                    if (py.PyErr_Occurred() == null) {
+                        py.PyErr_SetString(py.PyExc_TypeError, "Expected list of strings");
+                    }
+                    return error.InvalidString;
+                }
+                const pattern_ptr: [*:0]const u8 = @ptrCast(py.PyBytes_AsString(pattern_bytes));
+
+                exclude[@intCast(k)] = std.mem.span(pattern_ptr);
+            }
+        } 
+
         return Arguments{
             .target_license = target_license,
             .file_paths = file_paths,
@@ -141,6 +196,7 @@ pub const Arguments = struct {
             .continue_on_error = continue_on_error,
             .allocator = allocator,
             .extensions = extensions,
+            .exclude = exclude,
         };
     }
 };

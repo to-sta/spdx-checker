@@ -2,8 +2,9 @@
 const std = @import("std");
 const py = @import("python.zig").py;
 const ParseError = @import("errors.zig").ParseError;
-const Colors = @import("utils.zig").Colors;
-const utils = @import("utils.zig");
+const Colors = @import("utils/output.zig").Colors;
+const filter = @import("utils/filter.zig");
+const fix = @import("utils/fix.zig");
 const parse = @import("parse.zig");
 
 // Version information
@@ -65,6 +66,8 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
     const stdout = &stdout_writer.interface;
     defer stdout.flush() catch {};
 
+    // Determines if the terminal supports colors
+    // if not, Colors.select() will return no-op color codes
     const colors = Colors.select();
 
     stdout.print("{s}spdx_checker {s}v{d}.{d}.{d}{s}\n\n", .{ colors.bold, colors.purple, MAJOR, MINOR, PATCH, colors.reset }) catch {};
@@ -76,6 +79,11 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
     for (parsed_args.extensions) |ext| {
         stdout.print("{s}.{s}{s} ", .{ colors.green, ext, colors.reset }) catch {};
     }
+    stdout.print("\n\tExclude:\t\t", .{}) catch {};
+    for (parsed_args.exclude) |pattern| {
+        stdout.print("{s}{s}{s} ", .{ colors.red, pattern, colors.reset }) catch {};
+    }
+    stdout.print("\n", .{}) catch {};
 
     const start_nanos = std.time.nanoTimestamp();
 
@@ -86,14 +94,20 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
 
     // Filter file paths by extensions
     const original_file_count = parsed_args.file_paths.len;
-    const is_filtered = utils.filterByExtensions(allocator, parsed_args.extensions, &parsed_args.file_paths) catch {
+    const is_filtered = filter.filterByExtensions(allocator, parsed_args.extensions, &parsed_args.file_paths) catch {
         py.PyErr_SetString(PyExc_ValueError, "Failed to filter file paths by extensions.");
         return null;
     };
 
+    const is_excluded = filter.filterByGlobPattern(allocator, parsed_args.exclude, &parsed_args.file_paths) catch {
+        py.PyErr_SetString(PyExc_ValueError, "Failed to filter file paths by exclude patterns.");
+        return null;
+    };
+
+
     // Check if file paths list length is zero after filtering
     if (parsed_args.file_paths.len == 0) {
-        stdout.print("\n\n{s}No files to process after filtering by provided extensions.{s}\n\n", .{ colors.yellow, colors.reset }) catch {};
+        stdout.print("\n{s}No files to process after filtering by provided extensions.{s}\n\n", .{ colors.yellow, colors.reset }) catch {};
         return py.PyLong_FromLong(0);
     }
 
@@ -137,9 +151,9 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
 
                 // Here you would implement the fixing logic
                 // For now, just print a message
-                const file_extension = utils.getFileExtension(trimmed_path);
+                const file_extension = filter.getFileExtension(trimmed_path);
 
-                utils.addLicenseHeader(allocator, parsed_args, file, file_extension) catch |err| {
+                fix.addLicenseHeader(allocator, parsed_args, file, file_extension) catch |err| {
                     stdout.print("{s}E:{s} {s}\t{}\n", .{ colors.red, colors.reset, trimmed_path, err }) catch {};
                     if (!parsed_args.continue_on_error) {
                         py.PyErr_SetString(PyExc_ValueError, "Could not add license header to file");
@@ -175,6 +189,10 @@ fn spdx_license_checker(self: [*c]PyObject, args: [*c]PyObject, kwargs: [*c]PyOb
 
     if (is_filtered) {
         stdout.print("{s}Note:{s} File paths were filtered down from {d} to {d} by extensions provided.\n\n", .{ colors.yellow, colors.reset, original_file_count, parsed_args.file_paths.len }) catch {};
+    }
+
+    if (is_excluded) {
+        stdout.print("{s}Note:{s} File paths were filtered down by exclude patterns provided.\n\n", .{ colors.yellow, colors.reset }) catch {};
     }
 
     if (matched_files != checked_files) {
