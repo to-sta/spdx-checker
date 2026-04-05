@@ -35,7 +35,6 @@ pub const Colors = struct {
     }
 };
 
-
 pub const CommentStyles = struct {
     const Style = struct {
         prefix: []const u8,
@@ -62,8 +61,8 @@ pub const CommentStyles = struct {
         .{ "swift", Style{ .prefix = "// ", .postfix = "" } },
         .{ "go", Style{ .prefix = "// ", .postfix = "" } },
         .{ "rs", Style{ .prefix = "// ", .postfix = "" } },
-        .{ "svelte", Style{ .prefix = "// ", .postfix = "" } },
-        .{ "vue", Style{ .prefix = "// ", .postfix = "" } },
+        .{ "svelte", Style{ .prefix = "<!-- ", .postfix = " -->" } },
+        .{ "vue", Style{ .prefix = "<!-- ", .postfix = " -->" } },
         .{ "zig", Style{ .prefix = "// ", .postfix = "" } },
         .{ "py", Style{ .prefix = "# ", .postfix = "" } },
         .{ "sh", Style{ .prefix = "# ", .postfix = "" } },
@@ -98,4 +97,3 @@ pub const ColorSet = struct {
     blue: []const u8,
     purple: []const u8,
 };
-
