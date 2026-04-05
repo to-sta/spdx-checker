@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 const std = @import("std");
 
-const VERSION = 0x000114; // Version 0.1.20
+const VERSION = 0x000115; // Version 0.1.21
 // This breaks down as:
 // 0x00 = major (0)
 // 0x01 = minor (1)  
