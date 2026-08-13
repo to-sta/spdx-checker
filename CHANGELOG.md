@@ -2,6 +2,12 @@
 
 All notable changes to this project are recorded here. Changelog has been added with version 0.1.4. The format is similar to the [Keep a Changelog](<(https://keepachangelog.com/en/1.0.0/)>) convention.
 
+## [0.1.21] - 2026-05-04
+
+## Fixed
+
+- Pre- and Post Comment style for .svelte and .vue files
+
 ## [0.1.20] - 2025-12-06
 
 ## Added
