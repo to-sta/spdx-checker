@@ -19,6 +19,38 @@ pub const Arguments = struct {
         self.allocator.free(self.exclude);
     }
 
+    /// Converts a Python list of `len` strings into a newly allocated slice
+    /// of Zig strings.
+    ///
+    /// `list_obj` must be a Python list with at least `len` items, and `len`
+    /// must be non-negative (as returned by a successful `PyList_Size` call).
+    fn pyStringListToSlice(allocator: std.mem.Allocator, list_obj: [*c]py.PyObject, len: isize) ParseError![][]const u8 {
+        const result = try allocator.alloc([]const u8, @intCast(len));
+        errdefer allocator.free(result);
+
+        var idx: isize = 0;
+        while (idx < len) : (idx += 1) {
+            const item = py.PyList_GetItem(list_obj, idx);
+            if (item == null) {
+                py.PyErr_SetString(py.PyExc_TypeError, "Invalid list item");
+                return error.InvalidListItem;
+            }
+
+            const item_bytes = py.PyUnicode_AsUTF8String(item);
+            if (item_bytes == null) {
+                if (py.PyErr_Occurred() == null) {
+                    py.PyErr_SetString(py.PyExc_TypeError, "Expected list of strings");
+                }
+                return error.InvalidString;
+            }
+            const item_ptr: [*:0]const u8 = @ptrCast(py.PyBytes_AsString(item_bytes));
+
+            result[@intCast(idx)] = std.mem.span(item_ptr);
+        }
+
+        return result;
+    }
+
     pub fn parse(args: [*c]py.PyObject, kwargs: [*c]py.PyObject, allocator: std.mem.Allocator) ParseError!Arguments {
         // Variables to hold parsed values
         var target_license_ptr: [*:0]const u8 = undefined;
@@ -48,10 +80,12 @@ pub const Arguments = struct {
         // Args and Kwargs parsing
         // Python docs: https://docs.python.org/3/c-api/arg.html#c.PyArg_ParseTupleAndKeywords
         //
-        // Format: "sO!|OOpp"
+        // Format: "sO|OOpp"
         //
         //  s: string (target_license)
-        //  O!: object with type check (file_paths, must be a list)
+        //  O: object (file_paths, list-ness verified manually via PyList_Check below,
+        //     since `O!` requires taking the address of `PyList_Type`, which is an
+        //     opaque type under Py_LIMITED_API and can no longer be referenced directly)
         //  |: indicates the following arguments are optional
         //  O: object (extensions, optional)
         //  O: object (exclude, optional)
@@ -60,10 +94,9 @@ pub const Arguments = struct {
         const results = py.PyArg_ParseTupleAndKeywords(
             args,
             kwargs,
-            "sO!|OOpp",
+            "sO|OOpp",
             @constCast(&kwlist),
             &target_license_ptr,
-            &py.PyList_Type,
             &file_paths_obj,
             &extensions_obj,
             &exclude_obj,
@@ -74,7 +107,12 @@ pub const Arguments = struct {
         if (results == 0) {
             return error.ParseFailed;
         }
-        
+
+        if (py.PyList_Check(file_paths_obj) == 0) {
+            py.PyErr_SetString(py.PyExc_TypeError, "file_paths must be a list");
+            return error.InvalidList;
+        }
+
         // If extensions are not provided, set to an empty list
         if (extensions_obj == null) {
             extensions_obj = py.PyList_New(0);
@@ -103,91 +141,14 @@ pub const Arguments = struct {
             return error.InvalidList;
         }
 
-        const file_paths = allocator.alloc([]const u8, @intCast(file_paths_len)) catch |err| {
-            return err;
-        };
+        const file_paths = try pyStringListToSlice(allocator, file_paths_obj, file_paths_len);
         errdefer allocator.free(file_paths);
 
-        const extensions = allocator.alloc([]const u8, @intCast(extensions_len)) catch |err| {
-            return err;
-        };
+        const extensions = try pyStringListToSlice(allocator, extensions_obj, extensions_len);
         errdefer allocator.free(extensions);
 
-        const exclude = allocator.alloc([]const u8, @intCast(exclude_pattern_len)) catch |err| {
-            return err;
-        };
+        const exclude = try pyStringListToSlice(allocator, exclude_obj, exclude_pattern_len);
         errdefer allocator.free(exclude);
-
-        var i: isize = 0;
-        while (i < file_paths_len) : (i += 1) {
-            const item = py.PyList_GetItem(file_paths_obj, i);
-            if (item == null) {
-                allocator.free(file_paths);
-                py.PyErr_SetString(py.PyExc_TypeError, "Invalid list item");
-                return error.InvalidListItem;
-            }
-
-            const filepath_bytes = py.PyUnicode_AsUTF8String(item);
-            if (filepath_bytes == null) {
-                allocator.free(file_paths);
-                if (py.PyErr_Occurred() == null) {
-                    py.PyErr_SetString(py.PyExc_TypeError, "Expected list of strings");
-                }
-                return error.InvalidString;
-            }
-            const filepath_ptr: [*:0]const u8 = @ptrCast(py.PyBytes_AsString(filepath_bytes));
-
-            file_paths[@intCast(i)] = std.mem.span(filepath_ptr);
-        }
-
-        if (extensions_len > 0) {
-            var j: isize = 0;
-            while (j < extensions_len) : (j += 1) {
-                const item = py.PyList_GetItem(extensions_obj, j);
-                if (item == null) {
-                    allocator.free(extensions);
-                    py.PyErr_SetString(py.PyExc_TypeError, "Invalid list item");
-                    return error.InvalidListItem;
-                }
-
-                const ext_bytes = py.PyUnicode_AsUTF8String(item);
-                if (ext_bytes == null) {
-                    allocator.free(extensions);
-                    if (py.PyErr_Occurred() == null) {
-                        py.PyErr_SetString(py.PyExc_TypeError, "Expected list of strings");
-                    }
-                    return error.InvalidString;
-                }
-                const ext_ptr: [*:0]const u8 = @ptrCast(py.PyBytes_AsString(ext_bytes));
-
-                extensions[@intCast(j)] = std.mem.span(ext_ptr);
-            }
-        }
-
-        if (exclude_pattern_len > 0) {
-            var k: isize = 0;
-
-            while (k < exclude_pattern_len) : (k += 1) {
-                const item = py.PyList_GetItem(exclude_obj, k);
-                if (item == null) {
-                    allocator.free(exclude);
-                    py.PyErr_SetString(py.PyExc_TypeError, "Invalid list item");
-                    return error.InvalidListItem;
-                }
-
-                const pattern_bytes = py.PyUnicode_AsUTF8String(item);
-                if (pattern_bytes == null) {
-                    allocator.free(exclude);
-                    if (py.PyErr_Occurred() == null) {
-                        py.PyErr_SetString(py.PyExc_TypeError, "Expected list of strings");
-                    }
-                    return error.InvalidString;
-                }
-                const pattern_ptr: [*:0]const u8 = @ptrCast(py.PyBytes_AsString(pattern_bytes));
-
-                exclude[@intCast(k)] = std.mem.span(pattern_ptr);
-            }
-        } 
 
         return Arguments{
             .target_license = target_license,

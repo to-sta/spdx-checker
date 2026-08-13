@@ -1,5 +1,13 @@
 const std = @import("std");
 
+/// Prints a formatted line to `stdout`, silently ignoring write errors.
+///
+/// Centralizes the `stdout.print(...) catch {}` pattern used throughout the
+/// CLI-style output so call sites don't need to repeat the `catch {}`.
+pub fn printLine(stdout: *std.Io.Writer, comptime fmt: []const u8, args: anytype) void {
+    stdout.print(fmt, args) catch {};
+}
+
 /// Color codes for terminal output
 /// - `ansi`: ANSI escape codes for colored output
 /// - `none`: No color codes (plain text)
@@ -26,8 +34,9 @@ pub const Colors = struct {
     };
 
     /// Selects the appropriate ColorSet based on terminal capabilities
-    pub fn select() ColorSet {
-        if (std.fs.File.stdout().isTty()) {
+    pub fn select(io: std.Io) ColorSet {
+        const is_tty = std.Io.File.stdout().isTty(io) catch false;
+        if (is_tty) {
             return ansi;
         } else {
             return none;
@@ -97,3 +106,7 @@ pub const ColorSet = struct {
     blue: []const u8,
     purple: []const u8,
 };
+
+/// The SPDX license identifier tag expected at the start of a header line,
+/// e.g. `// SPDX-License-Identifier: MIT`.
+pub const spdx_prefix = "SPDX-License-Identifier: ";
