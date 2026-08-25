@@ -90,7 +90,7 @@ wheels = [
 
 [[package]]
 name = "spdx-checker"
-version = "0.1.20"
+version = "0.1.23"
 source = { editable = "." }
 
 [package.dev-dependencies]

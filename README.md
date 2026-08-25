@@ -19,22 +19,35 @@ The wheels published by the GitHub Actions workflow are built with cibuildwheel.
 import spdx_checker
 
 spdx_checker.check_license(
-    "MIT", 
-    ["example1.py", "example2.svelte", "example3.html"]
-    extensions=["zig", "py", "svelte"]
-    exclude=["**/__init__.py"]
+    "MIT",
+    ["example1.py", "example2.svelte", "example3.html"],
+    extensions=["zig", "py", "svelte"],
+    exclude=["**/__init__.py"],
     fix=True,
-    continue_on_error=False
-    )
+    continue_on_error=False,
+)
 ```
 
 ## Development
 
-Issues with uv caching
+Install the project in editable mode and run both test suites:
 
+```shell
+uv pip install -e .
+uv run pytest
+zig test extension/tests.zig
 ```
-To force uv to ignore existing installed versions, pass --reinstall to any installation command (e.g., uv sync --reinstall or uv pip install --reinstall ...).
-```
+
+The native extension is organized into four boundaries:
+
+- `extension/core`: configuration, checking, headers, and aggregate results
+- `extension/filesystem`: path selection, glob matching, and file mutation
+- `extension/presentation`: streamed terminal output and colors
+- `extension/python`: CPython argument, exception, and module adapters
+
+The checker core does not depend on CPython or terminal presentation. It emits
+transient events and returns a constant-size aggregate report, so report memory
+does not grow with the number of checked files.
 
 ## License
 

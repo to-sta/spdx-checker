@@ -1,4 +1,5 @@
 recursive-include spdx_checker *.pyi
 recursive-include spdx_checker py.typed
+recursive-include extension *.zig
 include README.md
 include LICENSE

@@ -11,3 +11,4 @@ zig-cache/
 wheelhouse/
 extracted/
 testing.md
+.zig-cache/

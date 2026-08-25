@@ -2,6 +2,12 @@
 
 All notable changes to this project are recorded here. Changelog has been added with version 0.1.4. The format is similar to the [Keep a Changelog](<(https://keepachangelog.com/en/1.0.0/)>) convention.
 
+## [0.1.23] - 2026-08-25
+
+## Changed
+
+- Architecture overhaul
+
 ## [0.1.22] - 2026-08-13
 
 ## Added

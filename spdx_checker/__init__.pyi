@@ -4,10 +4,16 @@ SPDX License Checker - Type Stub File (package layout)
 This stub file provides type hints for the Zig-compiled spdx_checker extension.
 """
 
-def check_license(target_license: str, file_paths: list[str], extensions: list[str] | None = None, exclude: list[str] | None = None, fix: bool = False, continue_on_error: bool = True) -> int:
+def check_license(
+    target_license: str,
+    file_paths: list[str],
+    extensions: list[str] | None = None,
+    exclude: list[str] | None = None,
+    fix: bool = False,
+    continue_on_error: bool = False,
+) -> int:
     """
-    Checks against a list of allowed SPDX Licenses and then checks each file's
-    first line against the target license.
+    Checks each file's first line against the target license.
 
     Parameters
     ----------
@@ -21,7 +27,7 @@ def check_license(target_license: str, file_paths: list[str], extensions: list[s
         A list of glob patterns to exclude certain files from the check.
     fix : bool, optional (default=False)
         If True, attempts to fix files that do not match the target license by adding SPDX license headers.
-    continue_on_error : bool, optional (default=True)
+    continue_on_error : bool, optional (default=False)
         If True, continues checking other files even if one file fails the license check.
 
     Returns
