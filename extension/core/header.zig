@@ -43,6 +43,7 @@ const styles = std.StaticStringMap(CommentStyle).initComptime(.{
     .{ "cc", CommentStyle{ .prefix = "// ", .postfix = "" } },
     .{ "cxx", CommentStyle{ .prefix = "// ", .postfix = "" } },
     .{ "js", CommentStyle{ .prefix = "// ", .postfix = "" } },
+    .{ "mjs", CommentStyle{ .prefix = "//", .postfix = "" } },
     .{ "ts", CommentStyle{ .prefix = "// ", .postfix = "" } },
     .{ "tsx", CommentStyle{ .prefix = "// ", .postfix = "" } },
     .{ "jsx", CommentStyle{ .prefix = "// ", .postfix = "" } },
