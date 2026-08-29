@@ -8,6 +8,10 @@ All notable changes to this project are recorded here. Changelog has been added 
 
 - Architecture overhaul
 
+## Added
+
+- File extensions .mjs added
+
 ## [0.1.22] - 2026-08-13
 
 ## Added
